@@ -383,10 +383,48 @@ export default function Sidebar({ role }: SidebarProps) {
   );
   const isDepartmentHead = Boolean(headStatus?.isHead);
 
-  const activeNavItems =
-    displayRole === "employee" && isDepartmentHead
-      ? [...navItems.employee, ...departmentHeadNavItems]
-      : navItems[displayRole];
+  // Full activity feed — only for allowlisted employee emails (server-checked).
+  // No admin UI indicates this; failed/403 → canView false.
+  const { data: auditAccess } = useSWR<{ canView?: boolean }>(
+    displayRole === "employee" && sessionUserId ? "/api/employee/activity?probe=1" : null,
+    async (url: string) => {
+      const res = await fetch(url);
+      if (res.status === 401 || res.status === 403) return { canView: false };
+      if (!res.ok) return { canView: false };
+      return res.json();
+    }
+  );
+  const canViewAuditLogs = Boolean(auditAccess?.canView);
+
+  const auditLogNavItem = {
+    href: "/employee/activity",
+    label: "Activity Logs",
+    icon: (
+      <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5a2 2 0 012-2h2a2 2 0 012 2v0a2 2 0 01-2 2h-2a2 2 0 01-2-2v0z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6M9 16h6" />
+      </svg>
+    ),
+  };
+
+  let activeNavItems = [...navItems[displayRole]];
+  if (displayRole === "employee" && isDepartmentHead) {
+    activeNavItems = [...activeNavItems, ...departmentHeadNavItems];
+  }
+  if (displayRole === "employee" && canViewAuditLogs) {
+    // Insert before Profile Settings
+    const profileIdx = activeNavItems.findIndex((item) => item.href === "/employee/profile");
+    if (profileIdx >= 0) {
+      activeNavItems = [
+        ...activeNavItems.slice(0, profileIdx),
+        auditLogNavItem,
+        ...activeNavItems.slice(profileIdx),
+      ];
+    } else {
+      activeNavItems = [...activeNavItems, auditLogNavItem];
+    }
+  }
 
   const defaultProfile =
     displayRole === "admin"

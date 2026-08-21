@@ -150,7 +150,19 @@ const parsedHourlyRate = parsedSalary / standardHours;
       jobTitle: normalizedDesignation,
     });
 
-    const emailSent = await sendWelcomeEmail(name, normalizedEmail, password);
+    const emailResult = await sendWelcomeEmail(name, normalizedEmail, password);
+
+    if (!emailResult.ok) {
+      const { logEmailIssue } = await import("@/lib/activity-log-email");
+      await logEmailIssue({
+        userId: newUser._id.toString(),
+        kind: "welcome",
+        subjectLabel: name,
+        emailAddress: normalizedEmail,
+        reason: emailResult.error || "Welcome email delivery failed",
+        status: "Failed",
+      });
+    }
 
     const newEmployeeHourlyRate = (newEmployee as { hourlyRate?: unknown }).hourlyRate;
 
@@ -172,7 +184,7 @@ const parsedHourlyRate = parsedSalary / standardHours;
 
     return NextResponse.json(
       {
-        message: emailSent 
+        message: emailResult.ok
           ? "Employee registered and welcome email sent successfully" 
           : "Employee registered successfully (email delivery pending domain setup)",
         employee: formattedNewEmployee,

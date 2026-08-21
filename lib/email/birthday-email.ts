@@ -1,5 +1,6 @@
 import { resend } from "@/lib/resend";
 import { getResendFromAddress, isResendConfigured } from "@/lib/email/config";
+import { EmailSendResult, formatEmailError } from "@/lib/email/send-result";
 
 export function getBirthdayEmailTemplate(name: string): string {
   const currentYear = new Date().getFullYear();
@@ -69,13 +70,14 @@ export async function sendBirthdayEmail(
   name: string,
   designation?: string,
   department?: string
-): Promise<boolean> {
+): Promise<EmailSendResult> {
   void designation;
   void department;
 
   if (!isResendConfigured()) {
-    console.error("Resend API Key (RESEND_API_KEY) is missing. Birthday email dispatch skipped.");
-    return false;
+    const error = "RESEND_API_KEY is missing — birthday email skipped";
+    console.error(error);
+    return { ok: false, error };
   }
 
   try {
@@ -89,13 +91,15 @@ export async function sendBirthdayEmail(
     });
 
     if (emailResponse.error) {
+      const error = formatEmailError(emailResponse.error, "Resend birthday delivery failed");
       console.error(`Resend birthday delivery failed for ${name}:`, emailResponse.error);
-      return false;
+      return { ok: false, error };
     }
 
-    return true;
+    return { ok: true };
   } catch (error) {
+    const message = formatEmailError(error, "Unexpected birthday email error");
     console.error(`An unexpected error occurred during birthday email delivery to ${name}:`, error);
-    return false;
+    return { ok: false, error: message };
   }
 }

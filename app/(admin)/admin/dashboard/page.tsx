@@ -17,6 +17,9 @@ import AddEmployeeModal from "@/app/components/admin/employees/AddEmployeeModal"
 import Link from "next/link";
 import { RecentActivityPanel } from "@/app/components/admin/RecentActivityPanel";
 import BirthdayCelebrationsCard from "@/app/components/admin/dashbord/BirthdayCelebrationsCard";
+import UpcomingBirthdaysCard, {
+  UpcomingBirthday,
+} from "@/app/components/admin/dashbord/UpcomingBirthdaysCard";
 
 function getFriendlyErrorMessage(error: string | null): string | null {
   if (!error) return null;
@@ -65,6 +68,7 @@ interface DashboardStatsResponse {
   todayAttendancePercent: number;
   presentToday: number;
   todayBirthdays: TodayBirthday[];
+  upcomingBirthdays?: UpcomingBirthday[];
 }
 
 export default function AdminDashboardPage() {
@@ -82,6 +86,7 @@ export default function AdminDashboardPage() {
 
   const dashboardStats = data ?? null;
   const todayBirthdays = Array.isArray(data?.todayBirthdays) ? data.todayBirthdays : [];
+  const upcomingBirthdays = Array.isArray(data?.upcomingBirthdays) ? data.upcomingBirthdays : [];
   const statsLoading = isLoading;
   const statsError = error ? (error instanceof Error ? error.message : "Failed to load dashboard stats") : null;
 
@@ -223,6 +228,7 @@ export default function AdminDashboardPage() {
 
         {/* Modular Birthday Celebrants Section */}
         <BirthdayCelebrationsCard celebrants={todayBirthdays} />
+        <UpcomingBirthdaysCard upcoming={upcomingBirthdays} />
 
         {/* Secondary Row: Recent Activities & Quick Actions */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

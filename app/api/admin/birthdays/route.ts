@@ -1,18 +1,9 @@
-// app/api/employees/birthdays/route.ts (or your listing route path)
 import { NextResponse } from "next/server";
 import connectDB from "@/lib/mongodb";
 import { Employee } from "@/modals/Employee";
 import CompanyDetails from "@/modals/CompanyDetails";
 import { getAdminUser } from "@/lib/auth";
-
-// Small timezone-aware helper to get current Karachi year
-function getKarachiYear(date: Date): number {
-  const formatter = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Asia/Karachi",
-    year: "numeric",
-  });
-  return parseInt(formatter.format(date));
-}
+import { getKarachiDateParts, getStoredBirthMonthDay } from "@/lib/birthday-date";
 
 export async function GET(request: Request) {
   try {
@@ -40,10 +31,10 @@ export async function GET(request: Request) {
         {
           $or: [
             { birthdayVisibility: { $exists: false } },
-            { birthdayVisibility: { $ne: "hidden" } }
-          ]
-        }
-      ]
+            { birthdayVisibility: { $ne: "hidden" } },
+          ],
+        },
+      ],
     };
 
     if (deptParam !== "all") {
@@ -54,8 +45,8 @@ export async function GET(request: Request) {
       query.$and.push({
         $or: [
           { name: { $regex: searchParam, $options: "i" } },
-          { designation: { $regex: searchParam, $options: "i" } }
-        ]
+          { designation: { $regex: searchParam, $options: "i" } },
+        ],
       });
     }
 
@@ -75,6 +66,7 @@ export async function GET(request: Request) {
       image?: string;
       picture?: string;
     }
+
     const [company, rawEmployees] = await Promise.all([
       CompanyDetails.findOne().lean() as Promise<{ departments?: string[] } | null>,
       Employee.find(query)
@@ -83,18 +75,18 @@ export async function GET(request: Request) {
     ]);
     const departmentsList: string[] = company?.departments || [];
 
-    const today = new Date();
-    const currentMonthIdx = today.getMonth(); 
-    const currentDayNum = today.getDate();
-    const currentKarachiYear = getKarachiYear(today);
+    const karachi = getKarachiDateParts();
+    const currentMonthIdx = karachi.month - 1; // 0-based for UI
+    const currentDayNum = karachi.day;
+    const currentKarachiYear = karachi.year;
 
     const formattedEmployees = rawEmployees.map((emp) => {
       const dob = new Date(emp.dateOfBirth);
-      const birthMonth = dob.getMonth(); 
-      const birthDay = dob.getDate();   
-      const birthYear = dob.getFullYear();
+      const stored = getStoredBirthMonthDay(dob);
+      const birthMonth = stored.month - 1; // 0-based
+      const birthDay = stored.day;
+      const birthYear = dob.getUTCFullYear();
 
-      // Dynamic reset logic: If the email was sent in a different year, represent it as "Pending"
       let displayStatus = emp.birthdayEmailStatus || "Pending";
       if (emp.birthdayEmailSentYear && emp.birthdayEmailSentYear !== currentKarachiYear) {
         displayStatus = "Pending";
@@ -106,7 +98,6 @@ export async function GET(request: Request) {
         email: emp.userId?.email || "",
         department: emp.department,
         designation: emp.designation,
-        // profile photo fields (used by EmployeeRow avatar)
         profilePhotoUrl:
           emp.profilePhotoUrl ||
           emp.profilePhotoURL ||
@@ -117,7 +108,7 @@ export async function GET(request: Request) {
         birthDate: `${birthYear}-${String(birthMonth + 1).padStart(2, "0")}-${String(birthDay).padStart(2, "0")}`,
         birthDay,
         birthMonth,
-        birthdayEmailStatus: displayStatus
+        birthdayEmailStatus: displayStatus,
       };
     });
 
@@ -125,7 +116,7 @@ export async function GET(request: Request) {
     let monthCount = 0;
     let upcomingCount = 0;
 
-    const targetMonthIdx = monthParam === "all" ? currentMonthIdx : parseInt(monthParam);
+    const targetMonthIdx = monthParam === "all" ? currentMonthIdx : parseInt(monthParam, 10);
 
     formattedEmployees.forEach((emp) => {
       if (emp.birthMonth === targetMonthIdx) {
@@ -145,8 +136,8 @@ export async function GET(request: Request) {
 
     let finalEmployees = formattedEmployees;
     if (monthParam !== "all") {
-      const parsedMonth = parseInt(monthParam);
-      finalEmployees = finalEmployees.filter(emp => emp.birthMonth === parsedMonth);
+      const parsedMonth = parseInt(monthParam, 10);
+      finalEmployees = finalEmployees.filter((emp) => emp.birthMonth === parsedMonth);
     }
 
     return NextResponse.json({
@@ -154,11 +145,10 @@ export async function GET(request: Request) {
       metrics: {
         todayCount,
         monthCount,
-        upcomingCount
+        upcomingCount,
       },
-      employees: finalEmployees
+      employees: finalEmployees,
     });
-
   } catch (error) {
     return NextResponse.json(
       { error: "Internal Server Error", details: error instanceof Error ? error.message : String(error) },

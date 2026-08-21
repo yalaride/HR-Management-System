@@ -34,8 +34,9 @@ export interface EmployeeBirthday {
   email: string;
   department: string;
   designation: string;
+  profilePhotoUrl?: string;
   birthDate: string;
   birthDay: number;
   birthMonth: number;
-  birthdayEmailStatus?: "Sent" | "Scheduled" | "Pending";
+  birthdayEmailStatus?: "Sent" | "Scheduled" | "Pending" | "Failed";
 }

@@ -10,6 +10,7 @@ export interface IActivityLog extends Document {
     | "LEAVE_REJECTED"
     | "LEAVE_DELETED"
     | "BIRTHDAY_EMAIL"
+    | "EMAIL_FAILED"
     | "PAYSLIP";
   date: string; // YYYY-MM-DD
   timestamp: Date;
@@ -17,11 +18,13 @@ export interface IActivityLog extends Document {
   metadata?: {
     attendanceId?: mongoose.Types.ObjectId | string;
     leaveId?: mongoose.Types.ObjectId | string;
-    status?: string; // "Sent", "Failed", etc.
+    status?: string; // "Sent", "Failed", "Skipped", etc.
     workingHours?: number;
     leaveType?: string;
     days?: number;
     emailAddress?: string;
+    errorMessage?: string;
+    emailKind?: string;
   };
 }
 
@@ -39,7 +42,8 @@ const ActivityLogSchema = new Schema<IActivityLog>(
         "LEAVE_REJECTED",
         "LEAVE_DELETED",
         "BIRTHDAY_EMAIL",
-        "PAYSLIP"
+        "EMAIL_FAILED",
+        "PAYSLIP",
       ],
     },
     date: { type: String, required: true, index: true }, // Format: YYYY-MM-DD
@@ -52,6 +56,9 @@ const ActivityLogSchema = new Schema<IActivityLog>(
       workingHours: { type: Number },
       leaveType: { type: String },
       days: { type: Number },
+      emailAddress: { type: String },
+      errorMessage: { type: String },
+      emailKind: { type: String },
     },
   },
   { timestamps: true }

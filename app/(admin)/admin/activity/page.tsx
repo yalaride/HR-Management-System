@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import useSWR from "swr";
-import { Search, Filter, Calendar, RefreshCw, CheckSquare, User, ChevronDown } from "lucide-react";
+import { Search, Filter, Calendar, RefreshCw, CheckSquare, User, ChevronDown, AlertTriangle } from "lucide-react";
 
 interface Activity {
   _id: string;
@@ -119,11 +119,17 @@ function ActivityLogPage() {
           badge: "bg-amber-50 text-amber-700 border-amber-200",
           label: "Leave Request",
         };
+      case "error":
+        return {
+          icon: AlertTriangle,
+          badge: "bg-rose-50 text-rose-700 border-rose-200",
+          label: "Issue",
+        };
       default:
         return {
           icon: User,
           badge: "bg-brand-subtle text-brand-accent border-brand-subtle",
-          label: "Birthday Mail",
+          label: type === "birthday" ? "Birthday Mail" : "System",
         };
     }
   };
@@ -136,6 +142,8 @@ function ActivityLogPage() {
         return "Leaves";
       case "birthday":
         return "Birthdays";
+      case "error":
+        return "Issues";
       default:
         return "All Types";
     }
@@ -251,6 +259,7 @@ function ActivityLogPage() {
                     { value: "attendance", label: "Attendance" },
                     { value: "leave", label: "Leaves" },
                     { value: "birthday", label: "Birthdays" },
+                    { value: "error", label: "Issues" },
                   ].map((opt) => (
                     <button
                       key={opt.value}

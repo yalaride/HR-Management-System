@@ -1,5 +1,6 @@
 import { resend } from "@/lib/resend";
 import { getResendFromAddress, isResendConfigured } from "@/lib/email/config";
+import { EmailSendResult, formatEmailError } from "@/lib/email/send-result";
 
 function getPasswordResetEmailTemplate(name: string, resetUrl: string): string {
   const currentYear = new Date().getFullYear();
@@ -77,10 +78,15 @@ function getPasswordResetEmailTemplate(name: string, resetUrl: string): string {
   `;
 }
 
-export async function sendPasswordResetEmail(name: string, email: string, resetUrl: string): Promise<boolean> {
+export async function sendPasswordResetEmail(
+  name: string,
+  email: string,
+  resetUrl: string
+): Promise<EmailSendResult> {
   if (!isResendConfigured()) {
-    console.error("Resend API Key (RESEND_API_KEY) is missing. Password reset email skipped.");
-    return false;
+    const error = "RESEND_API_KEY is missing — password reset email skipped";
+    console.error(error);
+    return { ok: false, error };
   }
 
   try {
@@ -94,13 +100,15 @@ export async function sendPasswordResetEmail(name: string, email: string, resetU
     });
 
     if (emailResponse.error) {
+      const error = formatEmailError(emailResponse.error, "Resend password-reset delivery failed");
       console.error("Resend recovery delivery failed:", emailResponse.error);
-      return false;
+      return { ok: false, error };
     }
 
-    return true;
+    return { ok: true };
   } catch (error) {
+    const message = formatEmailError(error, "Unexpected password-reset email error");
     console.error("An unexpected error occurred during password reset email delivery:", error);
-    return false;
+    return { ok: false, error: message };
   }
 }

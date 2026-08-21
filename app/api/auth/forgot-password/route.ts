@@ -54,7 +54,16 @@ export async function POST(req: Request) {
     // Dispatch via Resend
     const sent = await sendPasswordResetEmail(displayName, user.email, resetUrl);
 
-    if (!sent) {
+    if (!sent.ok) {
+      const { logEmailIssue } = await import("@/lib/activity-log-email");
+      await logEmailIssue({
+        userId: user._id.toString(),
+        kind: "password_reset",
+        subjectLabel: displayName,
+        emailAddress: user.email,
+        reason: sent.error || "Password reset email delivery failed",
+        status: "Failed",
+      });
       return NextResponse.json({ message: "Error routing email transmission." }, { status: 500 });
     }
 

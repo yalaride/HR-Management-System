@@ -70,7 +70,12 @@ export async function GET() {
         profilePhotoUrl: employee.profilePhotoUrl || "",
         phoneNumber: employee.phoneNumber || "",
         address: employee.address || "",
-        dateOfBirth: employee.dateOfBirth ? employee.dateOfBirth.toISOString().split("T")[0] : "",
+        dateOfBirth: employee.dateOfBirth
+          ? (() => {
+              const d = employee.dateOfBirth as Date;
+              return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+            })()
+          : "",
         gender: employee.gender || "",
         maritalStatus: employee.maritalStatus || "",
         emergencyContactName: employee.emergencyContactName || "",
@@ -161,8 +166,10 @@ export async function PUT(request: Request) {
     employee.address = typeof address === "string" ? address.trim() : employee.address;
 
     if (typeof dateOfBirth === "string" && dateOfBirth) {
-      const parsed = new Date(dateOfBirth);
-      if (isNaN(parsed.getTime())) {
+      // Store calendar DOB at UTC noon so month/day never shift across timezones
+      const { parseCalendarDateToUtcNoon } = await import("@/lib/birthday-date");
+      const parsed = parseCalendarDateToUtcNoon(dateOfBirth);
+      if (!parsed) {
         return NextResponse.json({ error: "Invalid dateOfBirth" }, { status: 400 });
       }
       employee.dateOfBirth = parsed;

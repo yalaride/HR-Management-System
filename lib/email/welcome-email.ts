@@ -1,5 +1,6 @@
 import { resend } from "@/lib/resend";
 import { getResendFromAddress, isResendConfigured } from "@/lib/email/config";
+import { EmailSendResult, formatEmailError } from "@/lib/email/send-result";
 
 function getWelcomeEmailTemplate(name: string, email: string, temporaryPassword: string): string {
   const portalUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
@@ -88,10 +89,15 @@ function getWelcomeEmailTemplate(name: string, email: string, temporaryPassword:
   `;
 }
 
-export async function sendWelcomeEmail(name: string, email: string, tempPassword: string): Promise<boolean> {
+export async function sendWelcomeEmail(
+  name: string,
+  email: string,
+  tempPassword: string
+): Promise<EmailSendResult> {
   if (!isResendConfigured()) {
-    console.error("Resend API Key (RESEND_API_KEY) is missing. Onboarding email skipped.");
-    return false;
+    const error = "RESEND_API_KEY is missing — welcome email skipped";
+    console.error(error);
+    return { ok: false, error };
   }
 
   try {
@@ -105,13 +111,15 @@ export async function sendWelcomeEmail(name: string, email: string, tempPassword
     });
 
     if (emailResponse.error) {
+      const error = formatEmailError(emailResponse.error, "Resend welcome delivery failed");
       console.error("Resend onboarding delivery failed:", emailResponse.error);
-      return false;
+      return { ok: false, error };
     }
 
-    return true;
+    return { ok: true };
   } catch (error) {
+    const message = formatEmailError(error, "Unexpected welcome email error");
     console.error("An unexpected error occurred during email delivery:", error);
-    return false;
+    return { ok: false, error: message };
   }
 }
