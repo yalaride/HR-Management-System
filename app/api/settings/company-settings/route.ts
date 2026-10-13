@@ -33,7 +33,6 @@ export async function GET() {
         checkInDisplayBefore: 30,
         checkOutDisplayAfter: 0,
         autoCheckOut: false,
-        autoCheckOutBuffer: 30,
         payslipHeadName: "",
         payslipHeadTitle: "Authorized Signatory",
         payslipSignatureUrl: "",
@@ -90,7 +89,6 @@ async function handleUpdate(request: Request) {
       checkInDisplayBefore,
       checkOutDisplayAfter,
       autoCheckOut,
-      autoCheckOutBuffer,
       payslipHeadName,
       payslipHeadTitle,
       payslipSignatureUrl,
@@ -100,11 +98,6 @@ async function handleUpdate(request: Request) {
       companyLogoOffsetX,
       companyLogoOffsetY,
     } = body;
-
-    // Ensure autoCheckOutBuffer is a number between 0 and 30 minutes
-    let bufferInMinutes = typeof autoCheckOutBuffer === "number" ? autoCheckOutBuffer : 30;
-    if (bufferInMinutes > 30) bufferInMinutes = 30;
-    if (bufferInMinutes < 0) bufferInMinutes = 0;
 
     // Find the singular active settings document
     const existing = await CompanyDetails.findOne();
@@ -135,7 +128,6 @@ async function handleUpdate(request: Request) {
           : (existing?.checkOutDisplayAfter ?? 0),
       autoCheckOut:
         typeof autoCheckOut === "boolean" ? autoCheckOut : (existing?.autoCheckOut ?? false),
-      autoCheckOutBuffer: bufferInMinutes,
       payslipHeadName:
         typeof payslipHeadName === "string"
           ? payslipHeadName.trim()

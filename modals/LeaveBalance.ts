@@ -7,8 +7,22 @@ const LeaveBalanceSchema = new Schema(
     // Added customPolicy flag (defaults to false)
     customPolicy: { type: Boolean, required: true, default: false },
 
+    // --- Permanent-confirmation leave proration ---
+    // When an employee becomes Permanent part-way through a calendar year,
+    // their ANNUAL allowance is prorated for the remaining months of that
+    // year. `proratedForYear` records the year the proration applies to so
+    // the yearly reset can restore the full allowance afterwards.
+    proratedForYear: { type: Number, default: null },
+    // The full (unprorated) annual allowance, kept so the yearly reset can
+    // restore it for employees on a custom policy whose `allocated` was
+    // temporarily reduced by proration.
+    annualFullAllocation: { type: Number, default: null },
+    sickFullAllocation: { type: Number, default: null },
+    casualFullAllocation: { type: Number, default: null },
+
+
     ANNUAL: {
-      allocated: { type: Number, required: true, default: 15, min: 0 }, // Changed default to 15 to align with standard API baselines
+      allocated: { type: Number, required: true, default: 15, min: 0 },
       used: { type: Number, required: true, default: 0, min: 0 },
     },
 
@@ -19,11 +33,6 @@ const LeaveBalanceSchema = new Schema(
 
     CASUAL: {
       allocated: { type: Number, required: true, default: 6, min: 0 },
-      used: { type: Number, required: true, default: 0, min: 0 },
-    },
-
-    MONTHLY: {
-      allocated: { type: Number, required: true, default: 2, min: 0 },
       used: { type: Number, required: true, default: 0, min: 0 },
     },
   },

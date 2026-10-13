@@ -9,7 +9,7 @@
   /* Boundaries and Lines */
   --color-line-subtle: #e2e8f0;           /* Neutral-slate line (Slate 200) */
   
-  /* Modern Blue Accents */
+  /* Modern Blue Accents (Blue to Dark Blue hover) */
   --color-brand-accent: #2563eb;          /* Active state / Blue 600 */
   --color-brand-hover: #1d4ed8;           /* Darkened hover state / Blue 700 */
   --color-brand-subtle: #dbeafe;          /* Soft background / Blue 100 */
@@ -144,7 +144,7 @@ p {
 }
 
 @utility alert-info {
-  @apply w-full flex items-start gap-2 p-2.5 rounded-lg bg-blue-50/50 border border-blue-100 text-left;
+  @apply w-full flex items-start gap-2 p-2.5 rounded-lg bg-brand-subtle/50 border border-brand-subtle text-left;
 }
 
 @utility alert-warn {
@@ -231,7 +231,7 @@ p {
   @apply form-input pl-10;
 }
 
-/* 6. Birthday UI Utilities */
+/* 6. Birthday UI Utilities (Blue / Dark-Blue) */
 
 @keyframes birthdaySlideIn {
   from {
@@ -246,7 +246,7 @@ p {
 
 @utility birthday-banner {
   @apply relative overflow-hidden p-6 rounded-2xl text-white shadow-md
-         bg-linear-to-r from-blue-500 via-cyan-500 to-indigo-600;
+         bg-linear-to-r from-brand-hover via-brand-accent to-brand-hover;
   animation: birthdaySlideIn 300ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
@@ -271,7 +271,7 @@ p {
 }
 
 @utility birthday-card-overlay {
-  @apply absolute top-0 right-0 w-24 h-24 bg-linear-to-br from-blue-500/10 to-indigo-500/10 rounded-full blur-lg pointer-events-none;
+  @apply absolute top-0 right-0 w-24 h-24 bg-linear-to-br from-brand-accent/10 to-brand-hover/10 rounded-full blur-lg pointer-events-none;
 }
 
 @utility birthday-card-header {
@@ -287,11 +287,11 @@ p {
 }
 
 @utility birthday-card-celebrants-chip {
-  @apply text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 shrink-0;
+  @apply text-[10px] font-bold px-2 py-0.5 rounded-full bg-brand-subtle text-brand-accent border border-brand-subtle shrink-0;
 }
 
 @utility birthday-card-bday-icon {
-  @apply p-2 bg-linear-to-tr from-blue-500 to-indigo-600 text-white rounded-xl shadow-xs;
+  @apply p-2 bg-linear-to-tr from-brand-accent to-brand-hover text-white rounded-xl shadow-xs;
 }
 
 @utility birthday-celebrants-list {
@@ -300,12 +300,12 @@ p {
 
 @utility birthday-celebrant-tile {
   @apply flex items-center gap-3 p-3 rounded-xl bg-surface-main/70 border border-line-subtle
-         hover:border-blue-200 transition-colors duration-150;
+         hover:border-brand-accent/40 transition-colors duration-150;
 }
 
 @utility birthday-celebrant-avatar {
-  @apply h-9 w-9 rounded-full bg-linear-to-tr from-blue-100 to-indigo-100 flex items-center justify-center
-         border border-line-subtle font-bold text-xs text-blue-700 uppercase shrink-0;
+  @apply h-9 w-9 rounded-full bg-linear-to-tr from-brand-subtle to-brand-subtle flex items-center justify-center
+         border border-line-subtle font-bold text-xs text-brand-hover uppercase shrink-0;
 }
 
 @utility birthday-celebrant-emoji {

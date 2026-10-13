@@ -2,12 +2,12 @@
 
 import LoginForm from "./components/LoginForm";
 
-// Inline Left Vector Illustration
+// Inline Left Vector Illustration (Styled with Global Brand Colors)
 function LeftIllustration() {
   return (
     <div className="relative w-full flex items-center justify-center">
       {/* Background Soft Glow */}
-      <div className="absolute inset-0 bg-sky-200/40 blur-[40px] rounded-full scale-90 -z-10" />
+      <div className="absolute inset-0 bg-brand-subtle/50 blur-[40px] rounded-full scale-90 -z-10" />
       <svg
         viewBox="0 0 500 400"
         fill="none"
@@ -27,29 +27,29 @@ function LeftIllustration() {
           width="124"
           height="84"
           rx="6"
-          fill="#38bdf8"
-          fillOpacity="0.15"
+          fill="#2563eb"
+          fillOpacity="0.18"
         />
         <rect x="235" y="280" width="30" height="30" fill="#94a3b8" />
         <rect x="210" y="310" width="80" height="10" rx="5" fill="#64748b" />
 
         {/* UI Elements on Display */}
-        <rect x="200" y="200" width="45" height="25" rx="4" fill="#0093c4" />
+        <rect x="200" y="200" width="45" height="25" rx="4" fill="#2563eb" />
         <rect
           x="252"
           y="200"
           width="48"
           height="25"
           rx="4"
-          fill="#0284c7"
-          fillOpacity="0.4"
+          fill="#1d4ed8"
+          fillOpacity="0.5"
         />
-        <circle cx="215" cy="245" r="12" fill="#0093c4" />
+        <circle cx="215" cy="245" r="12" fill="#2563eb" />
         <rect x="235" y="240" width="55" height="6" rx="3" fill="#cbd5e1" />
         <rect x="235" y="250" width="35" height="6" rx="3" fill="#e2e8f0" />
 
         {/* Plant Pot */}
-        <path d="M 80 320 L 90 270 L 120 270 L 130 320 Z" fill="#0093c4" />
+        <path d="M 80 320 L 90 270 L 120 270 L 130 320 Z" fill="#2563eb" />
         <path
           d="M 105 270 C 80 230, 60 210, 75 190 C 95 210, 100 240, 105 270 Z"
           fill="#10b981"
@@ -94,7 +94,7 @@ function LeftIllustration() {
             stroke="#e2e8f0"
             strokeWidth="2"
           />
-          <rect x="85" y="115" width="40" height="8" rx="4" fill="#0093c4" />
+          <rect x="85" y="115" width="40" height="8" rx="4" fill="#2563eb" />
           <rect x="85" y="130" width="65" height="6" rx="3" fill="#cbd5e1" />
         </g>
       </svg>
@@ -102,12 +102,12 @@ function LeftIllustration() {
   );
 }
 
-// Inline Right Vector Illustration
+// Inline Right Vector Illustration (Styled with Global Brand Colors)
 function RightIllustration() {
   return (
     <div className="relative w-full flex items-center justify-center">
       {/* Background Soft Glow */}
-      <div className="absolute inset-0 bg-cyan-200/30 blur-[40px] rounded-full scale-90 -z-10" />
+      <div className="absolute inset-0 bg-brand-accent/20 blur-[40px] rounded-full scale-90 -z-10" />
       <svg
         viewBox="0 0 500 400"
         fill="none"
@@ -152,7 +152,7 @@ function RightIllustration() {
           stroke="#0f172a"
           strokeWidth="3"
         />
-        <rect x="188" y="238" width="74" height="44" rx="4" fill="#38bdf8" />
+        <rect x="188" y="238" width="74" height="44" rx="4" fill="#2563eb" />
         <line
           x1="195"
           y1="250"
@@ -198,18 +198,18 @@ function RightIllustration() {
 
 export default function Home() {
   return (
-    <div className="relative min-h-screen w-full bg-slate-50 font-sans antialiased flex flex-col lg:h-screen lg:overflow-hidden">
+    <div className="relative min-h-screen w-full bg-surface-main font-sans antialiased flex flex-col lg:h-screen lg:overflow-hidden">
       
       {/* Precision Header (72px Height) */}
-      <header className="sticky top-0 z-40 w-full h-[72px] flex items-center justify-between px-[16px] sm:px-[32px] lg:px-[48px] 2xl:px-[64px] bg-white/80 backdrop-blur-[12px] border-b border-slate-200/80 shrink-0">
+      <header className="sticky top-0 z-40 w-full h-[72px] flex items-center justify-between px-[16px] sm:px-[32px] lg:px-[48px] 2xl:px-[64px] bg-surface-card/80 backdrop-blur-[12px] border-b border-line-subtle shrink-0">
         
-        {/* Brand Logo */}
+        {/* Brand Logo - Using CSS Theme Colors */}
         <div className="flex items-center gap-[12px]">
-          <div className="w-[40px] h-[40px] rounded-[12px] bg-gradient-to-tr from-[#0078a0] via-[#0093c4] to-[#38bdf8] text-white flex items-center justify-center font-black text-[20px]">
+          <div className="w-[40px] h-[40px] rounded-[12px] bg-brand-accent text-white flex items-center justify-center font-black text-[20px] shadow-sm">
             S
           </div>
-          <span className="text-[22px] font-black tracking-tight text-slate-900">
-            Syncup<span className="text-[#0093c4]">.</span>
+          <span className="text-[22px] font-black tracking-tight text-content-main">
+            Syncup<span className="text-brand-accent">.</span>
           </span>
         </div>
 
@@ -226,8 +226,8 @@ export default function Home() {
             <span className="sm:hidden">Online</span>
           </div>
 
-          {/* Version Tag */}
-          <span className="px-[14px] py-[6px] rounded-full bg-[#0093c4]/10 text-[#0093c4] border border-[#0093c4]/20 text-[13px] font-bold">
+          {/* Version Tag - Using Brand Theme Accent */}
+          <span className="px-[14px] py-[6px] rounded-full bg-brand-subtle text-brand-accent border border-brand-accent/20 text-[13px] font-bold">
             v2.4
           </span>
 
@@ -235,13 +235,13 @@ export default function Home() {
 
       </header>
 
-      {/* Main Pixel-Controlled Split Content */}
+      {/* Main Split Content */}
       <div className="relative flex-1 flex flex-col lg:flex-row w-full h-[calc(100vh-72px)] min-h-0">
         
         {/* LEFT HALF - Pure White Background with Subtle Grid Pattern */}
-        <div className="relative w-full lg:w-1/2 h-full bg-white flex items-center justify-start overflow-hidden bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:24px_24px]">
+        <div className="relative w-full lg:w-1/2 h-full bg-surface-card flex items-center justify-start overflow-hidden bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:24px_24px]">
           
-          {/* Left Wing Illustration Box (320px - 440px Pixel Boundaries) */}
+          {/* Left Wing Illustration Box */}
           <div className="hidden lg:flex w-full justify-start items-center pl-[32px] xl:pl-[64px] 2xl:pl-[120px]">
             <div className="w-[280px] xl:w-[360px] 2xl:w-[440px] shrink-0">
               <LeftIllustration />
@@ -250,14 +250,14 @@ export default function Home() {
 
         </div>
 
-        {/* RIGHT HALF - Deep Teal Gradient Background */}
-        <div className="relative w-full lg:w-1/2 h-full bg-gradient-to-br from-[#0093c4] via-[#0082af] to-[#005f80] flex items-center justify-end overflow-hidden">
+        {/* RIGHT HALF - Deep Brand Blue Gradient Background */}
+        <div className="relative w-full lg:w-1/2 h-full bg-gradient-to-br from-brand-accent via-brand-hover to-brand-hover flex items-center justify-end overflow-hidden">
           
           {/* Ambient Radial Background Glows */}
-          <div className="absolute -top-[80px] -right-[80px] w-[320px] h-[320px] bg-cyan-300/20 rounded-full blur-[80px] pointer-events-none" />
-          <div className="absolute -bottom-[80px] -left-[80px] w-[320px] h-[320px] bg-sky-400/20 rounded-full blur-[80px] pointer-events-none" />
+          <div className="absolute -top-[80px] -right-[80px] w-[320px] h-[320px] bg-brand-accent/20 rounded-full blur-[80px] pointer-events-none" />
+          <div className="absolute -bottom-[80px] -left-[80px] w-[320px] h-[320px] bg-brand-subtle/20 rounded-full blur-[80px] pointer-events-none" />
 
-          {/* Right Wing Illustration Box (320px - 440px Pixel Boundaries) */}
+          {/* Right Wing Illustration Box */}
           <div className="hidden lg:flex w-full justify-end items-center pr-[32px] xl:pr-[64px] 2xl:pr-[120px]">
             <div className="w-[280px] xl:w-[360px] 2xl:w-[440px] shrink-0">
               <RightIllustration />
@@ -266,9 +266,9 @@ export default function Home() {
 
         </div>
 
-        {/* CENTER FLOATING LOGIN CARD (Strict Pixel Width & Padding) */}
+        {/* CENTER FLOATING LOGIN CARD */}
         <div className="w-full max-w-[440px] sm:max-w-[480px] lg:max-w-[520px] xl:max-w-[580px] 2xl:max-w-[640px] lg:absolute lg:top-1/2 lg:left-1/2 lg:-translate-x-1/2 lg:-translate-y-1/2 z-30 px-[16px] py-[32px] lg:p-0 my-auto mx-auto">
-          <div className="bg-white/95 backdrop-blur-[16px] rounded-[24px] p-[24px] sm:p-[28px] xl:p-[36px] border border-slate-200/80 transition-all">
+          <div className="bg-surface-card/95 backdrop-blur-[16px] rounded-[24px] p-[24px] sm:p-[28px] xl:p-[36px] border border-line-subtle shadow-lg transition-all">
             <LoginForm />
           </div>
         </div>

@@ -130,7 +130,7 @@ export default function TeamAttendancePage() {
         icon: "warning",
         title: "Check-in required",
         text: "Set a check-in time, or mark the employee absent.",
-        confirmButtonColor: "#7c3aed",
+        confirmButtonColor: "#2563eb",
       });
       return;
     }
@@ -162,7 +162,7 @@ export default function TeamAttendancePage() {
         icon: "error",
         title: "Save failed",
         text: err instanceof Error ? err.message : "Could not save attendance.",
-        confirmButtonColor: "#7c3aed",
+        confirmButtonColor: "#2563eb",
       });
     } finally {
       setSaving(false);

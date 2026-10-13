@@ -112,7 +112,7 @@ export default function LoginForm() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="name@company.com"
-              className="w-full pl-10 pr-4 py-2.5 sm:py-3 text-sm text-slate-900 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:border-[#0093c4] focus:ring-4 focus:ring-[#0093c4]/15 transition-all placeholder:text-slate-400 disabled:opacity-60"
+              className="w-full pl-10 pr-4 py-2.5 sm:py-3 text-sm text-slate-900 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:border-brand-accent focus:ring-4 focus:ring-brand-accent/15 transition-all placeholder:text-slate-400 disabled:opacity-60"
             />
           </div>
         </div>
@@ -123,7 +123,7 @@ export default function LoginForm() {
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
               Password
             </label>
-            <Link href="/forgot-password" className="text-xs font-medium text-[#0093c4] hover:text-[#007da7] hover:underline transition">
+            <Link href="/forgot-password" className="text-xs font-medium text-brand-accent hover:text-brand-hover hover:underline transition">
               Forgot password?
             </Link>
           </div>
@@ -140,7 +140,7 @@ export default function LoginForm() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full pl-10 pr-11 py-2.5 sm:py-3 text-sm text-slate-900 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:border-[#0093c4] focus:ring-4 focus:ring-[#0093c4]/15 transition-all placeholder:text-slate-400 disabled:opacity-60"
+              className="w-full pl-10 pr-11 py-2.5 sm:py-3 text-sm text-slate-900 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:border-brand-accent focus:ring-4 focus:ring-brand-accent/15 transition-all placeholder:text-slate-400 disabled:opacity-60"
             />
             <button
               type="button"
@@ -168,7 +168,7 @@ export default function LoginForm() {
       <button
         type="submit"
         disabled={loading}
-        className="w-full py-3 sm:py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#0093c4] to-[#0078a0] hover:from-[#0083b0] hover:to-[#00688c] text-white font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed mt-2"
+        className="w-full py-3 sm:py-3.5 px-4 rounded-xl bg-gradient-to-r from-brand-accent to-brand-hover hover:from-brand-hover hover:to-brand-hover text-white font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed mt-2"
       >
         {loading ? (
           <div className="flex items-center gap-2">

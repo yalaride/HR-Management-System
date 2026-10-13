@@ -5,7 +5,6 @@ export interface IEmployeeLeavePolicy extends Document {
   ANNUAL: number;
   SICK: number;
   CASUAL: number;
-  MONTHLY: number; // 2 leaves allowed per month
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -35,12 +34,6 @@ const EmployeeLeavePolicySchema = new Schema<IEmployeeLeavePolicy>(
       required: true,
       min: [0, "Casual leaves cannot be negative"],
       default: 6,
-    },
-    MONTHLY: {
-      type: Number,
-      required: true,
-      min: [0, "Monthly leaves cannot be negative"],
-      default: 2, // Default limit of 2 leaves per month
     },
   },
   {

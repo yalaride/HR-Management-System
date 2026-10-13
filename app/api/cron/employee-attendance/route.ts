@@ -152,16 +152,8 @@ async function executeAutoCheckoutProcess() {
   }
 
   const todayStr = getKarachiDateString();
-  const currentLocalMinutes = getKarachiMinutes();
-
-  const shiftEndMin = timeToMinutes(settings.shiftEnd || "17:00");
-  const bufferMin = typeof settings.autoCheckOutBuffer === "number" 
-    ? Math.min(30, Math.max(0, settings.autoCheckOutBuffer)) 
-    : 30;
-  
-  const autoCheckOutTriggerMinutes = shiftEndMin + bufferMin;
-
-  // Search for unclosed check-ins for today or past days
+  // The Vercel schedule runs once daily at 8:00 PM Asia/Karachi.
+  // Search for unclosed check-ins for today or past days.
   const unclosedLogs = await Attendance.find({
     checkIn: { $exists: true, $ne: null },
     $or: [{ checkOut: { $exists: false } }, { checkOut: null }],
@@ -170,11 +162,6 @@ async function executeAutoCheckoutProcess() {
   let autoCheckedOutCount = 0;
 
   for (const log of unclosedLogs) {
-    // If log is from today, ensure trigger time (shiftEnd + buffer) has passed
-    if (log.date === todayStr && currentLocalMinutes < autoCheckOutTriggerMinutes) {
-      continue;
-    }
-
     // Do not alter future dates
     if (log.date > todayStr) {
       continue;

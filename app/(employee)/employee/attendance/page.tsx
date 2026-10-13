@@ -30,7 +30,6 @@ interface ActiveSettings {
   checkInDisplayBefore: number;
   checkOutDisplayAfter: number;
   autoCheckOut: boolean;
-  autoCheckOutBuffer: number;
 }
 
 function ClockWidget() {
@@ -67,7 +66,6 @@ const DEFAULT_SETTINGS: ActiveSettings = {
   checkInDisplayBefore: 30,
   checkOutDisplayAfter: 30,
   autoCheckOut: false,
-  autoCheckOutBuffer: 30,
 };
 
 export default function EmployeeAttendancePage() {
@@ -81,7 +79,6 @@ export default function EmployeeAttendancePage() {
 
   const [isSunday, setIsSunday] = useState<boolean>(false);
   const [isWithinWindow, setIsWithinWindow] = useState<boolean>(false);
-  const [isPastAutoCheckOut, setIsPastAutoCheckOut] = useState<boolean>(false);
 
   // Shares the "/api/employee/attendance" cache with the employee dashboard,
   // so switching between the two pages is instant.
@@ -152,12 +149,6 @@ export default function EmployeeAttendancePage() {
       setIsWithinWindow(currentMins >= startLimit || currentMins <= endLimit);
     }
 
-    if (settings.autoCheckOut) {
-      const autoMins = shiftEndMin + (settings.autoCheckOutBuffer ?? 30);
-      setIsPastAutoCheckOut(currentMins >= autoMins);
-    } else {
-      setIsPastAutoCheckOut(false);
-    }
   }, [settings]);
 
   useEffect(() => {
@@ -266,7 +257,7 @@ export default function EmployeeAttendancePage() {
     );
   }
 
-  const isButtonsDisabled = isSunday || !isWithinWindow || isPastAutoCheckOut || actionLoading;
+  const isButtonsDisabled = isSunday || !isWithinWindow || actionLoading;
 
   return (
     <div className="space-y-6 pb-12">
@@ -340,14 +331,7 @@ export default function EmployeeAttendancePage() {
         </div>
       )}
 
-      {!isSunday && isWithinWindow && isPastAutoCheckOut && (
-        <div className="flex items-center gap-2.5 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold">
-          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-          <span>Shift Auto Checked-Out: System automatic threshold has run. Manual check-outs are disabled for this session.</span>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-xl bg-brand-subtle/50 border border-brand-subtle text-xs text-content-main leading-relaxed">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 rounded-xl bg-brand-subtle/50 border border-brand-subtle text-xs text-content-main leading-relaxed">
         <div className="flex gap-2">
           <AlertCircle className="w-4 h-4 text-brand-accent shrink-0 mt-0.5" />
           <div>
@@ -360,6 +344,13 @@ export default function EmployeeAttendancePage() {
           <div>
             <strong className="font-semibold block text-content-main">Operational Limits:</strong>
             Working hours count up to 8 hours max per day. Absent statuses will not count toward working hours.
+          </div>
+        </div>
+        <div className="flex gap-2 rounded-lg bg-amber-50 border border-amber-200 p-3 -my-1 text-amber-900">
+          <Timer className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+          <div>
+            <strong className="font-semibold block text-amber-900">Break Policy:</strong>
+            The scheduled break time is from <span className="font-bold">2:00 PM to 3:00 PM</span>.
           </div>
         </div>
       </div>

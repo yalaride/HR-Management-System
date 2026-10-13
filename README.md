@@ -42,8 +42,10 @@ flowchart TB
   end
 
   subgraph Vercel Cron
-    C1["/api/admin/birthdays/cron<br/>daily 04:00 UTC"]
-    C2["/api/admin/employee-attendance/cron<br/>daily 12:30 UTC"]
+    C1["/api/cron/birthdays<br/>daily 19:00 UTC / 00:00 PKT"]
+    C2["/api/cron/employee-attendance<br/>daily 19:00 UTC / 00:00 PKT"]
+    C3["/api/cron/check-reviews<br/>daily 19:00 UTC / 00:00 PKT"]
+    C4["/api/cron/leave-reset<br/>daily 19:00 UTC / 00:00 PKT"]
   end
 
   A --> P --> API
@@ -267,10 +269,14 @@ sequenceDiagram
 3. MongoDB Atlas → **Network Access** → allow Vercel (`0.0.0.0/0` is fine for serverless). Enable backups.
 4. Deploy. Seed admin once against the production database (`npm run seed:admin` locally with prod `MONGODB_URI`).
 5. Confirm crons in Vercel → **Crons**:
-   - Birthdays: `/api/admin/birthdays/cron` — `0 4 * * *` (04:00 UTC ≈ 09:00 PKT)
-   - Auto check-out: `/api/admin/employee-attendance/cron` — `30 12 * * *` (12:30 UTC ≈ 17:30 PKT)
+   - Birthdays: `/api/cron/birthdays` — `0 19 * * *` (19:00 UTC = 00:00 PKT)
+   - Review sync (internship/probation end → Due Review): `/api/cron/check-reviews` — `0 19 * * *` (19:00 UTC = 00:00 PKT)
+   - Leave reset (year rollover): `/api/cron/leave-reset` — `0 19 * * *` (19:00 UTC = 00:00 PKT, checks Asia/Karachi year daily)
+   - Auto check-out: `/api/cron/employee-attendance` — runs once daily at `0 15 * * *` UTC (**8:00 PM Asia/Karachi**). If the admin Auto Check-Out option is enabled, it closes still-open, unlocked, non-future attendance records and stamps checkout at the configured shift end. If disabled, no records are changed.
 
-Both crons **require** `CRON_SECRET`. Vercel sends `Authorization: Bearer <CRON_SECRET>` automatically.
+All cron routes **require** `CRON_SECRET`. Vercel sends `Authorization: Bearer <CRON_SECRET>` automatically.
+
+> Vercel cron schedules use UTC. The auto-checkout job is intentionally a single daily run; Vercel delivery can have platform timing variance.
 
 ---
 
@@ -280,14 +286,14 @@ Both crons **require** `CRON_SECRET`. Vercel sends `Authorization: Bearer <CRON_
 flowchart TD
   CI[Employee check-in] --> REC[(Attendance day record)]
   CO[Employee check-out] --> REC
-  CRON[Daily auto-checkout cron] -->|if autoCheckOut enabled<br/>and past shiftEnd + buffer| REC
+  CRON[Daily auto-checkout<br/>PKT 20:00] -->|if autoCheckOut enabled| REC
   ADMIN[Admin manual / retro edit] --> REC
   REC --> MONTH[(MonthlyAttendance aggregates)]
   LOCK[Month lock] --> MONTH
 ```
 
 - Timezone: **Asia/Karachi**
-- Auto check-out uses `shiftEnd + autoCheckOutBuffer` (not a separate `autoCheckOutTime`)
+- Auto check-out is controlled only by the `autoCheckOut` setting and runs at 8:00 PM Asia/Karachi.
 - Locked months are **not** reopened by sync / cron
 - When auto check-out is **off**, forgotten open shifts stay open for admin correction (no silent corruption)
 

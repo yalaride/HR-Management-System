@@ -1,7 +1,15 @@
 "use client";
 
 import React from "react";
-import { Calendar, FileText, CheckCircle2, XCircle, Clock } from "lucide-react";
+import { 
+  Calendar, 
+  FileText, 
+  CheckCircle2, 
+  XCircle, 
+  Clock, 
+  Inbox,
+  ArrowRight
+} from "lucide-react";
 
 export interface LeaveRecord {
   id: string;
@@ -19,111 +27,165 @@ interface LeaveHistoryTableProps {
   history: LeaveRecord[];
 }
 
-const statusStyles: Record<string, string> = {
-  APPROVED: "bg-emerald-50 text-emerald-700 border-emerald-100",
-  REJECTED: "bg-rose-50 text-rose-700 border-rose-100",
-  PENDING: "bg-amber-50 text-amber-700 border-amber-100",
+const statusConfig: Record<
+  string,
+  { bg: string; text: string; border: string; icon: React.ReactNode; dot: string }
+> = {
+  APPROVED: {
+    bg: "bg-emerald-50/80",
+    text: "text-emerald-700",
+    border: "border-emerald-200/60",
+    dot: "bg-emerald-500",
+    icon: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />,
+  },
+  REJECTED: {
+    bg: "bg-rose-50/80",
+    text: "text-rose-700",
+    border: "border-rose-200/60",
+    dot: "bg-rose-500",
+    icon: <XCircle className="w-3.5 h-3.5 text-rose-600" />,
+  },
+  PENDING: {
+    bg: "bg-amber-50/80",
+    text: "text-amber-700",
+    border: "border-amber-200/60",
+    dot: "bg-amber-500",
+    icon: <Clock className="w-3.5 h-3.5 text-amber-600" />,
+  },
 };
 
-const typeStyles: Record<string, string> = {
-  ANNUAL: "bg-indigo-50 text-indigo-700 border-indigo-100",
-  SICK: "bg-rose-50 text-rose-700 border-rose-100",
-  CASUAL: "bg-purple-50 text-purple-700 border-purple-100",
+const typeConfig: Record<string, { label: string; badgeClass: string }> = {
+  ANNUAL: {
+    label: "Annual Leave",
+    badgeClass: "bg-indigo-50/80 text-indigo-700 border-indigo-200/60",
+  },
+  SICK: {
+    label: "Sick Leave",
+    badgeClass: "bg-rose-50/80 text-rose-700 border-rose-200/60",
+  },
+  CASUAL: {
+    label: "Casual Leave",
+    badgeClass: "bg-violet-50/80 text-violet-700 border-violet-200/60",
+  },
 };
 
 export default function LeaveHistoryTable({ history }: LeaveHistoryTableProps) {
   return (
-    <div className="space-y-3">
-      <div className="text-[10px] font-extrabold uppercase tracking-widest text-gray-400">
-        Your Request History
-      </div>
+    <div className="space-y-3.5 w-full">
+      {/* Header Section */}
+      {/* Header Section */}
+<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1">
+  <div className="min-w-0 px-2 py-1.5">
+    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+      Request History
+    </h3>
+    <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
+      Overview of all your submitted leave applications
+    </p>
+  </div>
+  <span className="self-start sm:self-auto shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200/50">
+    {history.length} {history.length === 1 ? "Record" : "Records"}
+  </span>
+</div>
 
-      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+      {/* Main Table Card */}
+      <div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm overflow-hidden">
         {history.length === 0 ? (
-          <div className="text-center py-12 text-gray-500 text-sm">
-            No leave requests requested yet.
+          <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 mb-3 shadow-inner">
+              <Inbox className="w-6 h-6 stroke-[1.5]" />
+            </div>
+            <p className="text-sm font-semibold text-slate-700">No leave requests found</p>
+            <p className="text-xs text-slate-400 max-w-xs mt-1">
+              You haven&apos;t submitted any leave applications yet. New requests will appear here.
+            </p>
           </div>
         ) : (
-          <div className="overflow-x-hidden">
-            <table className="w-full text-left border-collapse">
+          <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200">
+            <table className="w-full text-left border-collapse min-w-[680px]">
               <thead>
-                <tr className="bg-gray-50/50 border-b border-gray-100 text-gray-400 text-[10px] font-extrabold uppercase tracking-wider">
-                  <th className="px-6 py-4">Leave Type</th>
-                  <th className="px-6 py-4">Requested Dates</th>
-                  <th className="px-6 py-4">Duration</th>
-                  <th className="px-6 py-4 max-w-sm">Reason for Leave</th>
-                  <th className="px-6 py-4 text-center">Status Flag</th>
+                <tr className="bg-slate-50/70 border-b border-slate-100 text-slate-500 text-[11px] font-semibold uppercase tracking-wider">
+                  <th className="py-3.5 px-5">Type</th>
+                  <th className="py-3.5 px-5">Dates Requested</th>
+                  <th className="py-3.5 px-5">Duration</th>
+                  <th className="py-3.5 px-5 max-w-xs">Reason</th>
+                  <th className="py-3.5 px-5 text-right">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100 text-gray-600 text-xs">
+              <tbody className="divide-y divide-slate-100 text-slate-600 text-xs">
                 {history.map((record) => {
-                  // Normalize casing properties dynamically
-                  const nType = String(record.typeUpper || record.type || "ANNUAL").toUpperCase();
-                  const nStatus = String(record.statusUpper || record.status || "PENDING").toUpperCase();
+                  const nType = String(
+                    record.typeUpper || record.type || "ANNUAL"
+                  ).toUpperCase();
+                  const nStatus = String(
+                    record.statusUpper || record.status || "PENDING"
+                  ).toUpperCase();
 
-                  const displayType =
-                    nType.includes("ANNUAL")
-                      ? "Annual Leave"
-                      : nType.includes("SICK")
-                        ? "Sick Leave"
-                        : nType.includes("CASUAL")
-                          ? "Casual Leave"
-                          : record.type;
+                  const typeInfo = typeConfig[nType] || {
+                    label: record.type,
+                    badgeClass: "bg-slate-100 text-slate-700 border-slate-200",
+                  };
 
+                  const statusInfo = statusConfig[nStatus] || {
+                    bg: "bg-slate-50",
+                    text: "text-slate-600",
+                    border: "border-slate-200",
+                    dot: "bg-slate-400",
+                    icon: <Clock className="w-3.5 h-3.5 text-slate-500" />,
+                  };
 
                   return (
-                    <tr key={record.id} className="hover:bg-gray-50/30 transition">
-                      <td className="px-6 py-4">
+                    <tr
+                      key={record.id}
+                      className="hover:bg-slate-50/60 transition-colors duration-150 group"
+                    >
+                      {/* Leave Type */}
+                      <td className="py-4 px-5 whitespace-nowrap">
                         <span
-                          className={`inline-flex items-center px-2.5 py-1 rounded border text-[10px] font-bold uppercase tracking-wide ${
-                            typeStyles[nType] || "bg-slate-50 text-slate-700 border-slate-100"
-                          }`}
+                          className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-semibold border ${typeInfo.badgeClass}`}
                         >
-                          {displayType}
+                          {typeInfo.label}
                         </span>
                       </td>
 
-                      <td className="px-6 py-4 font-semibold text-gray-900">
-                        <div className="flex items-center gap-1.5">
-                          <Calendar className="w-3.5 h-3.5 text-gray-400" />
-                          <span>
-                            {record.startDate} to {record.endDate}
-                          </span>
+                      {/* Requested Dates */}
+                      <td className="py-4 px-5 whitespace-nowrap">
+                        <div className="flex items-center gap-2 text-slate-800 font-medium text-xs">
+                          <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span>{record.startDate}</span>
+                          <ArrowRight className="w-3 h-3 text-slate-300 shrink-0" />
+                          <span>{record.endDate}</span>
                         </div>
                       </td>
 
-                      <td className="px-6 py-4 font-bold text-gray-900">
-                        {record.days} {record.days === 1 ? "Day" : "Days"}
+                      {/* Duration */}
+                      <td className="py-4 px-5 whitespace-nowrap">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-slate-100 text-slate-700">
+                          {record.days} {record.days === 1 ? "day" : "days"}
+                        </span>
                       </td>
 
-                      <td className="px-6 py-4 max-w-sm">
-                        <div className="flex items-start gap-1.5 leading-normal">
-                          <FileText className="w-3.5 h-3.5 text-gray-400 mt-0.5 shrink-0" />
-                          <span className="truncate block text-gray-500" title={record.reason}>
-                            {record.reason}
-                          </span>
-                        </div>
-                      </td>
-
-                      <td className="px-6 py-4 text-center">
-                        <div className="inline-flex items-center justify-center">
+                      {/* Reason */}
+                      <td className="py-4 px-5 max-w-xs">
+                        <div className="flex items-center gap-2">
+                          <FileText className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                           <span
-                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wide border ${
-                              statusStyles[nStatus] || "bg-slate-50 text-slate-700 border-slate-100"
-                            }`}
+                            className="truncate text-slate-600 text-xs block"
+                            title={record.reason}
                           >
-                            {nStatus === "APPROVED" && (
-                              <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                            )}
-                            {nStatus === "REJECTED" && (
-                              <XCircle className="w-3 h-3 text-rose-500" />
-                            )}
-                            {nStatus === "PENDING" && (
-                              <Clock className="w-3 h-3 text-amber-500" />
-                            )}
-                            {nStatus}
+                            {record.reason || "—"}
                           </span>
                         </div>
+                      </td>
+
+                      {/* Status */}
+                      <td className="py-4 px-5 text-right whitespace-nowrap">
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border tracking-wide ${statusInfo.bg} ${statusInfo.text} ${statusInfo.border}`}
+                        >
+                          {statusInfo.icon}
+                          {nStatus}
+                        </span>
                       </td>
                     </tr>
                   );

@@ -46,8 +46,8 @@ export function RecentActivityPanel() {
         };
       case "payslip":
         return {
-          indicator: "bg-blue-500",
-          badge: "bg-blue-50 text-blue-700 border-blue-100",
+          indicator: "bg-brand-accent",
+          badge: "bg-brand-subtle text-brand-hover border-brand-subtle",
           icon: FileText,
         };
       case "birthday":

@@ -102,7 +102,6 @@ interface CompanySettings {
   checkInDisplayBefore: number;
   checkOutDisplayAfter: number;
   autoCheckOut: boolean;
-  autoCheckOutBuffer: number;
   departments?: string[];
 }
 

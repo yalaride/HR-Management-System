@@ -5,7 +5,29 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import useSWR from "swr";
-import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import {
+  Activity,
+  Banknote,
+  BookOpen,
+  BookOpenCheck,
+  Cake,
+  CalendarCheck,
+  CalendarClock,
+  CalendarOff,
+  CalendarRange,
+  Clock3,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Settings,
+  UserCheck,
+  UserCog,
+  Users,
+  Wallet,
+  X,
+} from "lucide-react";
 
 /* ── 1. Sidebar Context & Provider ── */
 type SidebarContextValue = {
@@ -62,138 +84,79 @@ const navItems = {
     {
       href: "/admin/dashboard",
       label: "Dashboard",
-      icon: (
-        <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-        </svg>
-      ),
+      icon: <LayoutDashboard className="w-5 h-5 shrink-0" />,
     },
     {
       href: "/admin/employees",
       label: "Employees",
-      icon: (
-        <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-        </svg>
-      ),
+      icon: <Users className="w-5 h-5 shrink-0" />,
     },
     {
       href: "/admin/payslips",
       label: "Payslips",
-      icon: (
-        <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-        </svg>
-      ),
+      icon: <Banknote className="w-5 h-5 shrink-0" />, // Dedicated payroll / salary icon
     },
     {
       href: "/admin/leaves",
       label: "Leave Manager",
-      icon: (
-        <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-        </svg>
-      ),
+      icon: <CalendarCheck className="w-5 h-5 shrink-0" />, // Calendar approval / management
     },
     {
       href: "/admin/leaves-policy",
       label: "Leaves Policy",
-      icon: (
-        <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-        </svg>
-      ),
+      icon: <BookOpenCheck className="w-5 h-5 shrink-0" />, // Policy guidelines & rule checks
     },
-    // Activity (System Activity Logs) — temporarily hidden from the admin
-    // sidebar per request. Page/route still exists at /admin/activity;
-    // restore by re-adding this entry.
-    // {
-    //   href: "/admin/activity",
-    //   label: "Activity",
-    //   icon: (
-    //     <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    //       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 15a4 4 0 01-4 4H7a4 4 0 01-4-4V7a4 4 0 014-4h10a4 4 0 014 4v8z" />
-    //       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 8h10M7 12h6" />
-    //     </svg>
-    //   ),
-    // },
+    {
+      href: "/admin/hr-policies",
+      label: "HR Policies",
+      icon: <BookOpen className="w-5 h-5 shrink-0" />, // Company policies handbook
+    },
     {
       href: "/admin/employee-attendance",
       label: "Attendance Record",
-      icon: (
-        <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 11l3 3L22 4" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
-        </svg>
-      ),
+      icon: <CalendarClock className="w-5 h-5 shrink-0" />, // Date + time attendance logs
     },
     {
       href: "/admin/birthdays",
       label: "Birthdays",
-      icon: (
-        <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 22s8-4 8-10V6l-8-4-8 4v6c0 6 8 10 8 10z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 10h.01M15 10h.01" />
-        </svg>
-      ),
+      icon: <Cake className="w-5 h-5 shrink-0" />,
     },
     {
       href: "/admin/settings",
       label: "Settings",
-      icon: (
-        <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-        </svg>
-      ),
+      icon: <Settings className="w-5 h-5 shrink-0" />,
     },
   ],
   employee: [
     {
       href: "/employee/dashboard",
       label: "Dashboard",
-      icon: (
-        <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-        </svg>
-      ),
+      icon: <LayoutDashboard className="w-5 h-5 shrink-0" />,
     },
-    
     {
       href: "/employee/attendance",
       label: "Attendance",
-      icon: (
-        <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      ),
+      icon: <Clock3 className="w-5 h-5 shrink-0" />, // Clock-in / daily hours
     },
     {
       href: "/employee/leaves-request",
       label: "Leave",
-      icon: (
-        <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-        </svg>
-      ),
+      icon: <CalendarOff className="w-5 h-5 shrink-0" />, // Requesting time off / leave
+    },
+    {
+      href: "/employee/hr-policies",
+      label: "HR Policies",
+      icon: <BookOpen className="w-5 h-5 shrink-0" />, // Employee handbook
     },
     {
       href: "/employee/payslip-employee",
       label: "Payslips",
-      icon: (
-        <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-        </svg>
-      ),
+      icon: <Wallet className="w-5 h-5 shrink-0" />, // Personal salary & earnings
     },
     {
       href: "/employee/profile",
       label: "Profile Settings",
-      icon: (
-        <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-        </svg>
-      ),
+      icon: <UserCog className="w-5 h-5 shrink-0" />, // Profile configuration
     },
   ],
 };
@@ -203,21 +166,12 @@ const departmentHeadNavItems = [
   {
     href: "/employee/department/attendance",
     label: "Team Attendance",
-    icon: (
-      <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 11l3 3L22 4" />
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
-      </svg>
-    ),
+    icon: <UserCheck className="w-5 h-5 shrink-0" />,
   },
   {
     href: "/employee/department/leaves",
     label: "Team Leaves",
-    icon: (
-      <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-      </svg>
-    ),
+    icon: <CalendarRange className="w-5 h-5 shrink-0" />, // Team scheduled leave range (replaces duplicated Users icon)
   },
 ];
 
@@ -269,7 +223,7 @@ function UnifiedHeaderCard({
             </span>
           </>
         ) : (
-          /* Expanded State: Clean Logo, Role Badge & Email in One Integrated Section */
+          /* Expanded State: Logo, Role Badge & Email */
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="size-9 rounded-xl bg-brand-accent flex items-center justify-center font-bold text-white text-xs shrink-0 shadow-xs">
               S
@@ -309,9 +263,7 @@ function UnifiedHeaderCard({
         onClick={onCloseMobile}
         className="lg:hidden p-1.5 rounded-lg border border-line-subtle text-content-secondary hover:text-content-main hover:bg-surface-main cursor-pointer"
       >
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-        </svg>
+        <X className="w-5 h-5" />
       </button>
     </div>
   );
@@ -329,8 +281,7 @@ export default function Sidebar({ role }: SidebarProps) {
   const router = useRouter();
   const { data: session } = useSession();
 
-  // Close menus when the route changes (render-time adjustment instead of an
-  // effect, per React guidance — avoids a cascading re-render).
+  // Close menus on route changes
   const [prevPathname, setPrevPathname] = useState(pathname);
   if (prevPathname !== pathname) {
     setPrevPathname(pathname);
@@ -375,16 +326,14 @@ export default function Sidebar({ role }: SidebarProps) {
     (isAdminFromSession ? "admin" : isEmployeeFromSession ? "employee" : null) ||
     fallbackPathRole;
 
-  // Department-head status (server-verified) unlocks the "Team" nav items.
-  // Cached via SWR so route changes never re-trigger the request.
+  // Department-head status
   const sessionUserId = session?.user?.id;
   const { data: headStatus } = useSWR<{ isHead?: boolean }>(
     displayRole === "employee" && sessionUserId ? "/api/head/me" : null
   );
   const isDepartmentHead = Boolean(headStatus?.isHead);
 
-  // Full activity feed — only for allowlisted employee emails (server-checked).
-  // No admin UI indicates this; failed/403 → canView false.
+  // Full activity feed
   const { data: auditAccess } = useSWR<{ canView?: boolean }>(
     displayRole === "employee" && sessionUserId ? "/api/employee/activity?probe=1" : null,
     async (url: string) => {
@@ -399,13 +348,7 @@ export default function Sidebar({ role }: SidebarProps) {
   const auditLogNavItem = {
     href: "/employee/activity",
     label: "Activity Logs",
-    icon: (
-      <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5a2 2 0 012-2h2a2 2 0 012 2v0a2 2 0 01-2 2h-2a2 2 0 01-2-2v0z" />
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6M9 16h6" />
-      </svg>
-    ),
+    icon: <Activity className="w-5 h-5 shrink-0" />,
   };
 
   let activeNavItems = [...navItems[displayRole]];
@@ -413,7 +356,6 @@ export default function Sidebar({ role }: SidebarProps) {
     activeNavItems = [...activeNavItems, ...departmentHeadNavItems];
   }
   if (displayRole === "employee" && canViewAuditLogs) {
-    // Insert before Profile Settings
     const profileIdx = activeNavItems.findIndex((item) => item.href === "/employee/profile");
     if (profileIdx >= 0) {
       activeNavItems = [
@@ -450,9 +392,7 @@ export default function Sidebar({ role }: SidebarProps) {
             aria-label="Open Navigation"
             className="p-2 rounded-xl border border-line-subtle bg-surface-main text-content-secondary hover:text-content-main hover:bg-surface-card transition-all cursor-pointer"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
+            <Menu className="w-5 h-5" />
           </button>
 
           <span className="font-extrabold text-sm text-content-main tracking-tight">SyncUp</span>
@@ -483,10 +423,11 @@ export default function Sidebar({ role }: SidebarProps) {
                   onClick={() => setIsProfileOpen(false)}
                   className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-content-secondary hover:text-content-main hover:bg-surface-main rounded-xl transition-colors"
                 >
-                  <svg className="w-4 h-4 text-content-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
+                  {displayRole === "admin" ? (
+                    <Settings className="w-4 h-4 text-content-muted" />
+                  ) : (
+                    <UserCog className="w-4 h-4 text-content-muted" />
+                  )}
                   <span>{displayRole === "admin" ? "Settings" : "Profile"}</span>
                 </Link>
 
@@ -500,9 +441,7 @@ export default function Sidebar({ role }: SidebarProps) {
                   }}
                   className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                  </svg>
+                  <LogOut className="w-4 h-4" />
                   <span>Log out</span>
                 </button>
               </div>
@@ -526,7 +465,7 @@ export default function Sidebar({ role }: SidebarProps) {
         } ${isCollapsed ? "lg:w-18" : "lg:w-60"}`}
       >
         <div className="flex flex-col gap-5 overflow-y-auto scrollbar-none [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-          {/* Unified Brand + Role + Email Header Div */}
+          {/* Unified Brand + Role + Email Header */}
           <UnifiedHeaderCard
             displayRole={displayRole}
             userEmail={currentProfile.email}
@@ -584,9 +523,7 @@ export default function Sidebar({ role }: SidebarProps) {
               isCollapsed ? "justify-center" : ""
             }`}
           >
-            <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
+            <LogOut className="w-5 h-5 shrink-0" />
             {!isCollapsed && <span className="truncate">Log out</span>}
           </button>
         </div>

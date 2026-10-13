@@ -1,12 +1,20 @@
 {
   "crons": [
     {
-      "path": "/api/admin/birthdays/cron",
-      "schedule": "0 4 * * *"
+      "path": "/api/cron/birthdays",
+      "schedule": "0 19 * * *"
     },
     {
-      "path": "/api/admin/employee-attendance/cron",
-      "schedule": "30 12 * * *"
+      "path": "/api/cron/check-reviews",
+      "schedule": "0 19 * * *"
+    },
+    {
+      "path": "/api/cron/leave-reset",
+      "schedule": "0 19 * * *"
+    },
+    {
+      "path": "/api/cron/employee-attendance",
+      "schedule": "0 15 * * *"
     }
   ]
 }
