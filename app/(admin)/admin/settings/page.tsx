@@ -24,7 +24,6 @@ interface CompanySettingsState {
   checkInDisplayBefore: number;
   checkOutDisplayAfter: number;
   autoCheckOut: boolean;
-  autoCheckOutBuffer: number;
   payslipHeadName: string;
   payslipHeadTitle: string;
   payslipSignatureUrl: string;
@@ -81,10 +80,6 @@ export default function AdminSettingsPage() {
       checkOutDisplayAfter:
         typeof data?.checkOutDisplayAfter === "number" ? data.checkOutDisplayAfter : 0,
       autoCheckOut: typeof data?.autoCheckOut === "boolean" ? data.autoCheckOut : false,
-      autoCheckOutBuffer:
-        typeof data?.autoCheckOutBuffer === "number"
-          ? Math.min(30, Math.max(0, data.autoCheckOutBuffer))
-          : 30,
       payslipHeadName: data?.payslipHeadName || "",
       payslipHeadTitle: data?.payslipHeadTitle || "Authorized Signatory",
       payslipSignatureUrl: data?.payslipSignatureUrl || "",

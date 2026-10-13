@@ -88,7 +88,7 @@ export default function TeamLeavesPage() {
         icon: "error",
         title: "Action failed",
         text: err instanceof Error ? err.message : "Could not update leave request.",
-        confirmButtonColor: "#7c3aed",
+        confirmButtonColor: "#2563eb",
       });
     } finally {
       setActioningId(null);

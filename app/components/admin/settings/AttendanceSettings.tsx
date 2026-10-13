@@ -10,7 +10,6 @@ interface AttendanceData {
   checkInDisplayBefore: number;
   checkOutDisplayAfter: number;
   autoCheckOut: boolean;
-  autoCheckOutBuffer: number;
 }
 
 interface AttendanceSettingsProps {
@@ -39,7 +38,6 @@ export default function AttendanceSettings({ data, onSave, readOnly = false }: A
     gracePeriod: String(data.gracePeriod),
     checkInDisplayBefore: String(data.checkInDisplayBefore),
     checkOutDisplayAfter: String(data.checkOutDisplayAfter),
-    autoCheckOutBuffer: String(data.autoCheckOutBuffer ?? 30),
   });
 
   // Simulator Time state is purely local client-side state (never sent to backend)
@@ -54,7 +52,6 @@ export default function AttendanceSettings({ data, onSave, readOnly = false }: A
       gracePeriod: String(data.gracePeriod),
       checkInDisplayBefore: String(data.checkInDisplayBefore),
       checkOutDisplayAfter: String(data.checkOutDisplayAfter),
-      autoCheckOutBuffer: String(data.autoCheckOutBuffer ?? 30),
     });
     setSimulatedTime(data.shiftStart);
   }
@@ -245,25 +242,6 @@ export default function AttendanceSettings({ data, onSave, readOnly = false }: A
                   </label>
                 </div>
 
-                {tempData.autoCheckOut && (
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-content-secondary">
-                      Auto Check-Out Buffer (Minutes after Shift End, max 30)
-                    </label>
-                    <input
-                      type="number"
-                      min={0}
-                      max={30}
-                      required
-                      value={tempData.autoCheckOutBuffer ?? 30}
-                      onChange={(e) => {
-                        const val = Math.min(30, Math.max(0, Number(e.target.value) || 0));
-                        setTempData({ ...tempData, autoCheckOutBuffer: val });
-                      }}
-                      className="form-input text-xs w-full p-2 border border-line-subtle rounded-lg outline-none"
-                    />
-                  </div>
-                )}
               </div>
             </div>
           ) : (
@@ -296,7 +274,7 @@ export default function AttendanceSettings({ data, onSave, readOnly = false }: A
                 <ShieldAlert className="w-4 h-4 text-brand-accent" />
                 <span className="text-xs font-semibold text-content-secondary">
                   Auto Check-Out is <strong className="text-content-main">{data.autoCheckOut ? "Enabled" : "Disabled"}</strong>
-                  {data.autoCheckOut && ` (${data.autoCheckOutBuffer ?? 30} mins buffer after shift end)`}
+                  {data.autoCheckOut && " (runs daily at 08:00 PM Asia/Karachi)"}
                 </span>
               </div>
             </div>

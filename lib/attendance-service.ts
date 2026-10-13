@@ -17,7 +17,6 @@ export interface AttendanceSettings {
   shiftEnd?: string;
   gracePeriod?: number;
   autoCheckOut?: boolean;
-  autoCheckOutBuffer?: number;
 }
 
 /** Returns date formatted as "YYYY-MM-DD" in Asia/Karachi time */
@@ -66,7 +65,6 @@ export async function getActiveSettings() {
       checkInDisplayBefore: 30,
       checkOutDisplayAfter: 0,
       autoCheckOut: false,
-      autoCheckOutBuffer: 30,
     });
   }
   return settings;
@@ -171,90 +169,6 @@ async function syncMonthlyAttendanceAggregates(userId: string, year: number, mon
   );
 }
 
-/** On-demand auto check-out trigger, respects month locks */
-async function runAutoCheckOutIfNeeded(date: string, settings: AttendanceSettings) {
-  if (!settings?.autoCheckOut) return;
-
-  const todayStr = getKarachiDateString();
-  if (date > todayStr) return;
-
-  if (date === todayStr) {
-    const currentLocalMinutes = getKarachiMinutes();
-    const shiftEndMin = timeToMinutes(settings.shiftEnd || "17:00");
-    const bufferMin =
-      typeof settings.autoCheckOutBuffer === "number"
-        ? Math.min(30, Math.max(0, settings.autoCheckOutBuffer))
-        : 30;
-
-    if (currentLocalMinutes < shiftEndMin + bufferMin) {
-      return;
-    }
-  }
-
-  const pendingLogs = await Attendance.find({
-    date,
-    checkIn: { $exists: true, $ne: null },
-    $or: [{ checkOut: { $exists: false } }, { checkOut: null }],
-  }).lean();
-
-  if (pendingLogs.length === 0) return;
-
-  const [yearStr, monthStr] = date.split("-");
-  const year = parseInt(yearStr, 10);
-  const month = parseInt(monthStr, 10);
-
-  // Batch the month-lock lookup for all pending users (1 query instead of N)
-  const pendingUserIds = Array.from(new Set(pendingLogs.map((l) => String(l.userId))));
-  const lockRecords = await MonthlyAttendance.find({
-    userId: { $in: pendingUserIds },
-    year,
-    month,
-    isLocked: true,
-  })
-    .select("userId")
-    .lean();
-  const lockedUserIds = new Set(lockRecords.map((r) => String(r.userId)));
-
-  const bulkOps: Parameters<typeof Attendance.bulkWrite>[0] = [];
-  const usersToSync: string[] = [];
-
-  for (const log of pendingLogs) {
-    if (lockedUserIds.has(String(log.userId))) continue;
-
-    const checkoutISO = `${date}T${settings.shiftEnd || "17:00"}:00+05:00`;
-    let checkOutDate = new Date(checkoutISO);
-
-    if (log.checkIn && checkOutDate.getTime() < new Date(log.checkIn).getTime()) {
-      checkOutDate = new Date(log.checkIn);
-    }
-
-    const calculations = computeDailyShiftsAndHours(log.checkIn, checkOutDate, settings);
-
-    bulkOps.push({
-      updateOne: {
-        filter: { _id: log._id },
-        update: {
-          $set: {
-            checkOut: checkOutDate,
-            workingHours: calculations.workingHours,
-            formattedDuration: calculations.formattedDuration,
-            status: calculations.status,
-          },
-        },
-      },
-    });
-    usersToSync.push(String(log.userId));
-  }
-
-  if (bulkOps.length === 0) return;
-
-  await Attendance.bulkWrite(bulkOps);
-
-  for (const userId of usersToSync) {
-    await syncMonthlyAttendanceAggregates(userId, year, month);
-  }
-}
-
 /* ────────────────────────── High-level operations ────────────────────────── */
 
 export interface DaySheetOptions {
@@ -279,9 +193,6 @@ export async function getDayAttendanceSheet(date: string, options: DaySheetOptio
   const month = parseInt(parts[1], 10) || currentMonth;
 
   const settings = await getActiveSettings();
-
-  // Check and execute pending checkouts on page view as fallback
-  await runAutoCheckOutIfNeeded(date, settings);
 
   const employeeQuery: Record<string, unknown> = { status: { $ne: "Inactive" } };
   if (options.department) {

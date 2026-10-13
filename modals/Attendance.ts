@@ -17,7 +17,7 @@ const AttendanceSchema = new Schema<IAttendance>(
     userId: { type: String, required: true, index: true },
     date: { type: String, required: true, index: true }, 
     checkIn: { type: Date, required: true },
-    checkOut: { type: Date },
+    checkOut: { type: Date, default: null },
     workingHours: { type: Number, default: 0 },
     formattedDuration: { type: String, default: "" },
     status: { 

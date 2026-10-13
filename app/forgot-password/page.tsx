@@ -25,13 +25,13 @@ function LeftIllustration() {
           width="124"
           height="84"
           rx="6"
-          fill="#38bdf8"
+          fill="#2563eb"
           fillOpacity="0.15"
         />
         <rect x="235" y="280" width="30" height="30" fill="#94a3b8" />
         <rect x="210" y="310" width="80" height="10" rx="5" fill="#64748b" />
 
-        <rect x="200" y="200" width="45" height="25" rx="4" fill="#0093c4" />
+        <rect x="200" y="200" width="45" height="25" rx="4" fill="#2563eb" />
         <rect
           x="252"
           y="200"
@@ -41,11 +41,11 @@ function LeftIllustration() {
           fill="#0284c7"
           fillOpacity="0.4"
         />
-        <circle cx="215" cy="245" r="12" fill="#0093c4" />
+        <circle cx="215" cy="245" r="12" fill="#2563eb" />
         <rect x="235" y="240" width="55" height="6" rx="3" fill="#cbd5e1" />
         <rect x="235" y="250" width="35" height="6" rx="3" fill="#e2e8f0" />
 
-        <path d="M 80 320 L 90 270 L 120 270 L 130 320 Z" fill="#0093c4" />
+        <path d="M 80 320 L 90 270 L 120 270 L 130 320 Z" fill="#2563eb" />
         <path
           d="M 105 270 C 80 230, 60 210, 75 190 C 95 210, 100 240, 105 270 Z"
           fill="#10b981"
@@ -89,7 +89,7 @@ function LeftIllustration() {
             stroke="#e2e8f0"
             strokeWidth="2"
           />
-          <rect x="85" y="115" width="40" height="8" rx="4" fill="#0093c4" />
+          <rect x="85" y="115" width="40" height="8" rx="4" fill="#2563eb" />
           <rect x="85" y="130" width="65" height="6" rx="3" fill="#cbd5e1" />
         </g>
       </svg>
@@ -142,7 +142,7 @@ function RightIllustration() {
           stroke="#0f172a"
           strokeWidth="3"
         />
-        <rect x="188" y="238" width="74" height="44" rx="4" fill="#38bdf8" />
+        <rect x="188" y="238" width="74" height="44" rx="4" fill="#2563eb" />
         <line
           x1="195"
           y1="250"
@@ -233,7 +233,7 @@ function ForgotPasswordForm() {
   return (
     <div className="w-full">
       {/* Icon Header */}
-      <div className="w-[48px] h-[48px] rounded-[14px] bg-[#0093c4]/10 text-[#0093c4] flex items-center justify-center mb-[20px]">
+      <div className="w-[48px] h-[48px] rounded-[14px] bg-brand-subtle text-brand-accent flex items-center justify-center mb-[20px]">
         <svg
           className="w-[24px] h-[24px]"
           fill="none"
@@ -300,7 +300,7 @@ function ForgotPasswordForm() {
           <button
             type="button"
             onClick={() => setSuccess(false)}
-            className="text-[13px] font-bold text-[#0093c4] hover:underline cursor-pointer pt-[4px]"
+            className="text-[13px] font-bold text-brand-accent hover:underline cursor-pointer pt-[4px]"
           >
             Didn&apos;t receive email? Try again
           </button>
@@ -320,7 +320,7 @@ function ForgotPasswordForm() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="name@company.com"
-                className="w-full h-[48px] px-[16px] pl-[44px] rounded-[14px] bg-slate-50 border border-slate-200 text-[14px] text-slate-900 placeholder:text-slate-400 font-medium focus:outline-none focus:ring-2 focus:ring-[#0093c4] focus:border-transparent transition-all disabled:opacity-60"
+                className="w-full h-[48px] px-[16px] pl-[44px] rounded-[14px] bg-slate-50 border border-slate-200 text-[14px] text-slate-900 placeholder:text-slate-400 font-medium focus:outline-none focus:ring-2 focus:ring-brand-accent focus:border-transparent transition-all disabled:opacity-60"
               />
               <svg
                 className="w-[20px] h-[20px] text-slate-400 absolute left-[14px] top-1/2 -translate-y-1/2"
@@ -341,7 +341,7 @@ function ForgotPasswordForm() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full h-[48px] rounded-[14px] bg-gradient-to-r from-[#0093c4] to-[#0078a0] hover:from-[#0083b0] hover:to-[#00688c] text-white text-[15px] font-bold transition-all cursor-pointer flex items-center justify-center gap-[8px]"
+            className="w-full h-[48px] rounded-[14px] bg-gradient-to-r from-brand-accent to-brand-hover hover:from-brand-hover hover:to-brand-hover text-white text-[15px] font-bold transition-all cursor-pointer flex items-center justify-center gap-[8px]"
           >
             {loading ? (
               <span className="inline-flex items-center gap-[8px]">
@@ -374,7 +374,7 @@ function ForgotPasswordForm() {
       <div className="mt-[24px] pt-[20px] border-t border-slate-100 text-center">
         <Link
           href="/"
-          className="inline-flex items-center gap-[8px] text-[14px] font-bold text-slate-600 hover:text-[#0093c4] transition-colors"
+          className="inline-flex items-center gap-[8px] text-[14px] font-bold text-slate-600 hover:text-brand-accent transition-colors"
         >
           <svg
             className="w-[16px] h-[16px]"
@@ -402,11 +402,11 @@ export default function ForgotPasswordPage() {
         
         {/* Brand Logo */}
         <Link href="/" className="flex items-center gap-[12px]">
-          <div className="w-[40px] h-[40px] rounded-[12px] bg-gradient-to-tr from-[#0078a0] via-[#0093c4] to-[#38bdf8] text-white flex items-center justify-center font-black text-[20px]">
+          <div className="w-[40px] h-[40px] rounded-[12px] bg-brand-accent text-white flex items-center justify-center font-black text-[20px]">
             S
           </div>
           <span className="text-[22px] font-black tracking-tight text-slate-900">
-            Syncup<span className="text-[#0093c4]">.</span>
+            Syncup<span className="text-brand-accent">.</span>
           </span>
         </Link>
 
@@ -424,7 +424,7 @@ export default function ForgotPasswordPage() {
           </div>
 
           {/* Version Tag */}
-          <span className="px-[14px] py-[6px] rounded-full bg-[#0093c4]/10 text-[#0093c4] border border-[#0093c4]/20 text-[13px] font-bold">
+          <span className="px-[14px] py-[6px] rounded-full bg-brand-subtle text-brand-accent border border-brand-accent/20 text-[13px] font-bold">
             v2.4
           </span>
 
@@ -448,7 +448,7 @@ export default function ForgotPasswordPage() {
         </div>
 
         {/* RIGHT HALF - Deep Teal Gradient Background */}
-        <div className="relative w-full lg:w-1/2 h-full bg-gradient-to-br from-[#0093c4] via-[#0082af] to-[#005f80] flex items-center justify-end overflow-hidden">
+        <div className="relative w-full lg:w-1/2 h-full bg-gradient-to-br from-brand-accent via-brand-hover to-brand-hover flex items-center justify-end overflow-hidden">
           
           {/* Ambient Glows */}
           <div className="absolute -top-[80px] -right-[80px] w-[320px] h-[320px] bg-cyan-300/20 rounded-full blur-[80px] pointer-events-none" />

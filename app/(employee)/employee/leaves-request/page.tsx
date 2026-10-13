@@ -8,24 +8,37 @@ import { LeaveDetailsModal } from "@/app/components/admin/leaves/LeaveDetailsMod
 import ApplyLeaveModal from "@/app/components/employee/ApplyLeaveModal";
 import { LeaveRequest, LeaveBalances } from "@/lib/types";
 
-type LeavesResponse =
-  | { leaves?: LeaveRecord[]; balances?: LeaveBalances }
-  | LeaveRecord[];
+// Standard SWR fetcher
+const fetcher = async (url: string) => {
+  const res = await fetch(url);
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || "Failed to fetch data");
+  }
+  return res.json();
+};
+
+// Normalize any leave type format (e.g. "Annual Leave" -> "ANNUAL")
+function normalizeLeaveType(type?: string): "ANNUAL" | "SICK" | "CASUAL" | "OTHER" {
+  const upper = String(type || "").trim().toUpperCase();
+  if (upper.includes("ANNUAL")) return "ANNUAL";
+  if (upper.includes("SICK")) return "SICK";
+  if (upper.includes("CASUAL")) return "CASUAL";
+  return "OTHER";
+}
 
 export default function EmployeeLeavesPage() {
   const [isApplyModalOpen, setIsApplyModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  
   const [selectedLeave, setSelectedLeave] = useState<LeaveRequest | null>(null);
 
-  // Shares the "/api/employee/leaves-request" cache with the employee dashboard
   const {
     data,
     error: loadError,
     isLoading: loading,
     mutate: refreshLeaves,
-  } = useSWR<LeavesResponse>("/api/employee/leaves-request");
+  } = useSWR("/api/employee/leaves-request", fetcher, { revalidateOnFocus: true });
 
   const history = useMemo<LeaveRecord[]>(() => {
     if (Array.isArray(data)) return data;
@@ -37,26 +50,49 @@ export default function EmployeeLeavesPage() {
     return null;
   }, [data]);
 
+  // Overall totals across all categories
+  const summary = useMemo(() => {
+    if (!balances) return { allocated: 0, used: 0, remaining: 0 };
+    return {
+      allocated: (balances.ANNUAL?.allocated ?? 0) + (balances.SICK?.allocated ?? 0) + (balances.CASUAL?.allocated ?? 0),
+      used: (balances.ANNUAL?.used ?? 0) + (balances.SICK?.used ?? 0) + (balances.CASUAL?.used ?? 0),
+      remaining: (balances.ANNUAL?.remaining ?? 0) + (balances.SICK?.remaining ?? 0) + (balances.CASUAL?.remaining ?? 0),
+    };
+  }, [balances]);
+
+  const canRequestLeave = !loading && !Array.isArray(data) && data?.canRequestLeave !== false;
   const displayMessage =
     message ||
-    (loadError ? { type: "error" as const, text: "Failed to load leave records" } : null);
+    (loadError
+      ? { type: "error" as const, text: loadError.message || "Failed to load leave records" }
+      : !loading && !canRequestLeave
+        ? {
+            type: "error" as const,
+            text: "Leave requests are available only for Permanent or Contract employees.",
+          }
+        : null);
 
   const handleRowClick = (record: LeaveRecord) => {
+    const normalizedKey = normalizeLeaveType(record.type);
+
     const mappedType: LeaveRequest["type"] =
-      record.type === "ANNUAL"
+      normalizedKey === "ANNUAL"
         ? "Annual Leave"
-        : record.type === "SICK"
+        : normalizedKey === "SICK"
           ? "Sick Leave"
-          : record.type === "CASUAL"
+          : normalizedKey === "CASUAL"
             ? "Casual Leave"
             : "Other Leave";
 
     const mappedStatus: LeaveRequest["status"] =
-      record.status === "APPROVED"
+      record.status?.toUpperCase() === "APPROVED"
         ? "Approved"
-        : record.status === "REJECTED"
+        : record.status?.toUpperCase() === "REJECTED"
           ? "Rejected"
           : "Pending";
+
+    // Lookup balance safely
+    const targetBalance = normalizedKey !== "OTHER" && balances ? balances[normalizedKey] : null;
 
     const mapped: LeaveRequest = {
       id: record.id,
@@ -69,10 +105,9 @@ export default function EmployeeLeavesPage() {
       days: record.days,
       reason: record.reason,
       status: mappedStatus,
-      
-      totalLeaves: balances?.[record.type as keyof LeaveBalances]?.allocated || 0,
-      usedLeaves: balances?.[record.type as keyof LeaveBalances]?.used || 0,
-      remainingLeaves: balances?.[record.type as keyof LeaveBalances]?.remaining || 0
+      totalLeaves: targetBalance?.allocated ?? 0,
+      usedLeaves: targetBalance?.used ?? 0,
+      remainingLeaves: targetBalance?.remaining ?? 0,
     };
     setSelectedLeave(mapped);
   };
@@ -93,25 +128,20 @@ export default function EmployeeLeavesPage() {
         body: JSON.stringify(formData),
       });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to submit leave request");
-      }
+      const responseData = await res.json();
+      if (!res.ok) throw new Error(responseData.error || "Failed to submit leave request");
 
       setMessage({
         type: "success",
-        text: `Leave request submitted successfully! ${data.newRequest?.days || ""} days requested.`,
+        text: `Leave request submitted successfully! ${responseData.newRequest?.days || ""} days requested.`,
       });
 
-      // Refresh the shared cache (history + balances) and close the modal
       await refreshLeaves();
       setIsApplyModalOpen(false);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to submit leave request";
       setMessage({
         type: "error",
-        text: errorMessage,
+        text: err instanceof Error ? err.message : "Failed to submit leave request",
       });
     } finally {
       setSubmitting(false);
@@ -120,7 +150,7 @@ export default function EmployeeLeavesPage() {
 
   return (
     <div className="space-y-6 pb-12">
-      {/* Header Section */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-6 border-b border-line-subtle">
         <div>
           <h1 className="text-xl sm:text-2xl font-extrabold text-content-main tracking-tight">
@@ -131,16 +161,18 @@ export default function EmployeeLeavesPage() {
           </p>
         </div>
         <button
-          onClick={() => setIsApplyModalOpen(true)}
-          disabled={submitting}
+          onClick={() => {
+            if (canRequestLeave) setIsApplyModalOpen(true);
+          }}
+          disabled={submitting || !canRequestLeave}
           className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-brand-accent text-white rounded-xl text-xs font-bold hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed transition duration-150 cursor-pointer shadow-xs"
         >
           <Plus className="w-4 h-4" />
-          Apply for Leave
+          {canRequestLeave ? "Apply for Leave" : "Leave Not Available"}
         </button>
       </div>
 
-      {/* Success/Error Alerts */}
+      {/* Alerts */}
       {displayMessage && (
         <div
           className={`p-4 rounded-xl text-xs font-semibold flex items-center gap-2.5 ${
@@ -158,9 +190,43 @@ export default function EmployeeLeavesPage() {
         </div>
       )}
 
-      {/* Leave Balance Cards */}
-      {balances && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+      {/* Leave Balance Cards (Including Grand Total Card) */}
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="bg-surface-card border border-line-subtle rounded-2xl p-5 shadow-xs animate-pulse">
+              <div className="h-3 w-24 rounded bg-surface-main" />
+              <div className="mt-5 space-y-3">
+                <div className="h-3 rounded bg-surface-main" />
+                <div className="h-3 rounded bg-surface-main" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : balances ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+          {/* Total Overall Leaves Card */}
+          <div className="bg-brand-accent/5 border border-brand-accent/20 rounded-2xl p-5 shadow-xs flex flex-col justify-between">
+            <h3 className="text-xs font-bold text-brand-accent uppercase tracking-widest mb-3">
+              Total Leaves
+            </h3>
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs">
+                <span className="text-content-muted font-medium">Allocated:</span>
+                <span className="font-bold text-content-main">{summary.allocated}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-content-muted font-medium">Used:</span>
+                <span className="font-bold text-amber-600">{summary.used}</span>
+              </div>
+              <div className="flex justify-between text-xs border-t border-line-subtle pt-2 mt-1">
+                <span className="text-content-muted font-medium">Remaining:</span>
+                <span className="font-bold text-emerald-600">{summary.remaining}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Categorized Cards */}
           {(["ANNUAL", "SICK", "CASUAL"] as const).map((leaveType) => {
             const balance = balances[leaveType];
             return (
@@ -174,62 +240,52 @@ export default function EmployeeLeavesPage() {
                 <div className="space-y-2">
                   <div className="flex justify-between text-xs">
                     <span className="text-content-muted font-medium">Allocated:</span>
-                    <span className="font-bold text-content-main">{balance.allocated || 0}</span>
+                    <span className="font-bold text-content-main">{balance?.allocated ?? 0}</span>
                   </div>
                   <div className="flex justify-between text-xs">
                     <span className="text-content-muted font-medium">Used:</span>
-                    <span className="font-bold text-amber-600">{balance.used || 0}</span>
+                    <span className="font-bold text-amber-600">{balance?.used ?? 0}</span>
                   </div>
                   <div className="flex justify-between text-xs border-t border-line-subtle pt-2 mt-1">
                     <span className="text-content-muted font-medium">Remaining:</span>
-                    <span className="font-bold text-emerald-600">{balance.remaining || 0}</span>
+                    <span className="font-bold text-emerald-600">{balance?.remaining ?? 0}</span>
                   </div>
                 </div>
               </div>
             );
           })}
         </div>
-      )}
+      ) : null}
 
       {/* Leave History Section */}
-      {loading ? (
-        <div className="text-center py-16 text-content-muted text-xs font-medium">
-          <div className="flex justify-center items-center gap-2">
-            <div className="w-4 h-4 border-2 border-brand-accent border-t-transparent rounded-full animate-spin" />
-            <span>Loading leave records...</span>
-          </div>
-        </div>
-      ) : (
-        <div
-          onClick={(e) => {
-            const row = (e.target as HTMLElement).closest("tbody tr") as HTMLTableRowElement | null;
-            if (row) {
-              const index = row.sectionRowIndex;
-              if (index !== -1 && history[index]) {
-                handleRowClick(history[index]);
-              }
+      <div
+        onClick={(e) => {
+          const row = (e.target as HTMLElement).closest("tbody tr") as HTMLTableRowElement | null;
+          if (row) {
+            const index = row.sectionRowIndex;
+            if (index !== -1 && history[index]) {
+              handleRowClick(history[index]);
             }
-          }}
-          className="overflow-x-auto rounded-2xl bg-surface-card border border-line-subtle shadow-xs"
-        >
-          {history && history.length > 0 ? (
-            <LeaveHistoryTable history={history} />
-          ) : (
-            <div className="text-center py-12 text-content-muted">
-              <p className="text-xs font-medium">No leave records found.</p>
-            </div>
-          )}
-        </div>
-      )}
+          }
+        }}
+        className="overflow-x-auto rounded-2xl bg-surface-card border border-line-subtle shadow-xs"
+      >
+        {history && history.length > 0 ? (
+          <LeaveHistoryTable history={history} />
+        ) : (
+          <div className="text-center py-12 text-content-muted">
+            <p className="text-xs font-medium">No leave records found.</p>
+          </div>
+        )}
+      </div>
 
-      {/* Apply Leave Modal */}
       <ApplyLeaveModal
         isOpen={isApplyModalOpen}
         onClose={() => setIsApplyModalOpen(false)}
         onSubmit={handleApplyLeave}
+        canRequestLeave={canRequestLeave}
       />
 
-      {/* Read-Only Leave Details Modal */}
       {selectedLeave && (
         <LeaveDetailsModal
           leave={selectedLeave}

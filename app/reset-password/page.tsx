@@ -26,13 +26,13 @@ function LeftIllustration() {
           width="124"
           height="84"
           rx="6"
-          fill="#38bdf8"
+          fill="#2563eb"
           fillOpacity="0.15"
         />
         <rect x="235" y="280" width="30" height="30" fill="#94a3b8" />
         <rect x="210" y="310" width="80" height="10" rx="5" fill="#64748b" />
 
-        <rect x="200" y="200" width="45" height="25" rx="4" fill="#0093c4" />
+        <rect x="200" y="200" width="45" height="25" rx="4" fill="#2563eb" />
         <rect
           x="252"
           y="200"
@@ -42,11 +42,11 @@ function LeftIllustration() {
           fill="#0284c7"
           fillOpacity="0.4"
         />
-        <circle cx="215" cy="245" r="12" fill="#0093c4" />
+        <circle cx="215" cy="245" r="12" fill="#2563eb" />
         <rect x="235" y="240" width="55" height="6" rx="3" fill="#cbd5e1" />
         <rect x="235" y="250" width="35" height="6" rx="3" fill="#e2e8f0" />
 
-        <path d="M 80 320 L 90 270 L 120 270 L 130 320 Z" fill="#0093c4" />
+        <path d="M 80 320 L 90 270 L 120 270 L 130 320 Z" fill="#2563eb" />
         <path
           d="M 105 270 C 80 230, 60 210, 75 190 C 95 210, 100 240, 105 270 Z"
           fill="#10b981"
@@ -90,7 +90,7 @@ function LeftIllustration() {
             stroke="#e2e8f0"
             strokeWidth="2"
           />
-          <rect x="85" y="115" width="40" height="8" rx="4" fill="#0093c4" />
+          <rect x="85" y="115" width="40" height="8" rx="4" fill="#2563eb" />
           <rect x="85" y="130" width="65" height="6" rx="3" fill="#cbd5e1" />
         </g>
       </svg>
@@ -143,7 +143,7 @@ function RightIllustration() {
           stroke="#0f172a"
           strokeWidth="3"
         />
-        <rect x="188" y="238" width="74" height="44" rx="4" fill="#38bdf8" />
+        <rect x="188" y="238" width="74" height="44" rx="4" fill="#2563eb" />
         <line
           x1="195"
           y1="250"
@@ -214,7 +214,7 @@ function StyledPasswordInput({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className="w-full h-[48px] px-[16px] pl-[44px] pr-[44px] rounded-[14px] bg-slate-50 border border-slate-200 text-[14px] text-slate-900 placeholder:text-slate-400 font-medium focus:outline-none focus:ring-2 focus:ring-[#0093c4] focus:border-transparent transition-all disabled:opacity-60"
+          className="w-full h-[48px] px-[16px] pl-[44px] pr-[44px] rounded-[14px] bg-slate-50 border border-slate-200 text-[14px] text-slate-900 placeholder:text-slate-400 font-medium focus:outline-none focus:ring-2 focus:ring-brand-accent focus:border-transparent transition-all disabled:opacity-60"
         />
         {/* Left Lock Icon */}
         <svg
@@ -361,7 +361,7 @@ function ResetPasswordFormContent() {
       {/* 1. Verifying State Spinner */}
       {isVerifying && (
         <div className="text-center py-[32px] space-y-[16px]">
-          <div className="w-[36px] h-[36px] border-3 border-[#0093c4] border-t-transparent rounded-full animate-spin mx-auto" />
+          <div className="w-[36px] h-[36px] border-3 border-brand-accent border-t-transparent rounded-full animate-spin mx-auto" />
           <p className="text-[14px] font-semibold text-slate-600">
             Verifying secure authorization link...
           </p>
@@ -395,13 +395,13 @@ function ResetPasswordFormContent() {
 
           <Link
             href="/forgot-password"
-            className="w-full h-[48px] rounded-[14px] bg-gradient-to-r from-[#0093c4] to-[#0078a0] hover:from-[#0083b0] hover:to-[#00688c] text-white text-[15px] font-bold transition-all flex items-center justify-center gap-[8px]"
+            className="w-full h-[48px] rounded-[14px] bg-gradient-to-r from-brand-accent to-brand-hover hover:from-brand-hover hover:to-brand-hover text-white text-[15px] font-bold transition-all flex items-center justify-center gap-[8px]"
           >
             Request New Reset Link
           </Link>
 
           <div className="pt-[12px] text-center">
-            <Link href="/" className="text-[14px] font-bold text-slate-600 hover:text-[#0093c4] transition-colors">
+            <Link href="/" className="text-[14px] font-bold text-slate-600 hover:text-brand-accent transition-colors">
               Back to Login
             </Link>
           </div>
@@ -412,7 +412,7 @@ function ResetPasswordFormContent() {
       {!isVerifying && isTokenValid && (
         <div>
           {/* Header Icon */}
-          <div className="w-[48px] h-[48px] rounded-[14px] bg-[#0093c4]/10 text-[#0093c4] flex items-center justify-center mb-[20px]">
+          <div className="w-[48px] h-[48px] rounded-[14px] bg-brand-subtle text-brand-accent flex items-center justify-center mb-[20px]">
             <svg className="w-[24px] h-[24px]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
             </svg>
@@ -470,7 +470,7 @@ function ResetPasswordFormContent() {
               <button
                 type="submit"
                 disabled={loading}
-              className="w-full h-[48px] mt-[8px] rounded-[14px] bg-gradient-to-r from-[#0093c4] to-[#0078a0] hover:from-[#0083b0] hover:to-[#00688c] text-white text-[15px] font-bold transition-all cursor-pointer flex items-center justify-center gap-[8px]"
+              className="w-full h-[48px] mt-[8px] rounded-[14px] bg-gradient-to-r from-brand-accent to-brand-hover hover:from-brand-hover hover:to-brand-hover text-white text-[15px] font-bold transition-all cursor-pointer flex items-center justify-center gap-[8px]"
               >
                 {loading ? (
                   <span className="inline-flex items-center gap-[8px]">
@@ -488,7 +488,7 @@ function ResetPasswordFormContent() {
           <div className="mt-[24px] pt-[20px] border-t border-slate-100 text-center">
             <Link
               href="/"
-              className="inline-flex items-center gap-[8px] text-[14px] font-bold text-slate-600 hover:text-[#0093c4] transition-colors"
+              className="inline-flex items-center gap-[8px] text-[14px] font-bold text-slate-600 hover:text-brand-accent transition-colors"
             >
               <svg className="w-[16px] h-[16px]" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
@@ -513,11 +513,11 @@ export default function ResetPasswordPage() {
         
         {/* Brand Logo */}
         <Link href="/" className="flex items-center gap-[12px]">
-          <div className="w-[40px] h-[40px] rounded-[12px] bg-gradient-to-tr from-[#0078a0] via-[#0093c4] to-[#38bdf8] text-white flex items-center justify-center font-black text-[20px]">
+          <div className="w-[40px] h-[40px] rounded-[12px] bg-brand-accent text-white flex items-center justify-center font-black text-[20px]">
             S
           </div>
           <span className="text-[22px] font-black tracking-tight text-slate-900">
-            Syncup<span className="text-[#0093c4]">.</span>
+            Syncup<span className="text-brand-accent">.</span>
           </span>
         </Link>
 
@@ -535,7 +535,7 @@ export default function ResetPasswordPage() {
           </div>
 
           {/* Version Tag */}
-          <span className="px-[14px] py-[6px] rounded-full bg-[#0093c4]/10 text-[#0093c4] border border-[#0093c4]/20 text-[13px] font-bold">
+          <span className="px-[14px] py-[6px] rounded-full bg-brand-subtle text-brand-accent border border-brand-accent/20 text-[13px] font-bold">
             v2.4
           </span>
 
@@ -559,7 +559,7 @@ export default function ResetPasswordPage() {
         </div>
 
         {/* RIGHT HALF - Deep Teal Gradient Background */}
-        <div className="relative w-full lg:w-1/2 h-full bg-gradient-to-br from-[#0093c4] via-[#0082af] to-[#005f80] flex items-center justify-end overflow-hidden">
+        <div className="relative w-full lg:w-1/2 h-full bg-gradient-to-br from-brand-accent via-brand-hover to-brand-hover flex items-center justify-end overflow-hidden">
           
           {/* Ambient Glows */}
           <div className="absolute -top-[80px] -right-[80px] w-[320px] h-[320px] bg-cyan-300/20 rounded-full blur-[80px] pointer-events-none" />
@@ -580,7 +580,7 @@ export default function ResetPasswordPage() {
             <Suspense
               fallback={
                 <div className="text-center py-[24px] space-y-[12px]">
-                  <div className="w-[32px] h-[32px] border-3 border-[#0093c4] border-t-transparent rounded-full animate-spin mx-auto" />
+                  <div className="w-[32px] h-[32px] border-3 border-brand-accent border-t-transparent rounded-full animate-spin mx-auto" />
                   <p className="text-[13px] font-semibold text-slate-500">Loading parameters...</p>
                 </div>
               }

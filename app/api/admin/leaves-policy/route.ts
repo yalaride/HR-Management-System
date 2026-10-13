@@ -6,6 +6,7 @@ import EmployeeLeavePolicy from "@/modals/LeavePolicy";
 import LeaveBalance from "@/modals/LeaveBalance";
 import { Employee } from "@/modals/Employee"; // Named export
 import User from "@/modals/User"; // Default export
+import { GlobalLeavePolicy } from "@/modals/GlobalLeavePolicy";
 
 // Shape of a lean Employee doc with the populated userId sub-document
 interface PolicyEmployee {
@@ -27,6 +28,12 @@ interface PolicyEmployee {
     picture?: string;
     toString(): string;
   } | null;
+}
+
+interface GlobalPolicyValues {
+  ANNUAL?: number;
+  SICK?: number;
+  CASUAL?: number;
 }
 
 // Shape of a populated userId reference once the "_id" presence check has passed
@@ -65,6 +72,14 @@ export async function GET() {
     }).filter(Boolean);
 
     // Fetch active leave balances for these user IDs
+    const globalPolicy = (await GlobalLeavePolicy.findOne({ key: "default" }).lean()) as unknown as
+      | GlobalPolicyValues
+      | null;
+    const defaults = {
+      ANNUAL: globalPolicy?.ANNUAL ?? 15,
+      SICK: globalPolicy?.SICK ?? 8,
+      CASUAL: globalPolicy?.CASUAL ?? 6,
+    };
     const leaveBalances = await LeaveBalance.find({
       userId: { $in: activeUserIds }
     }).lean();
@@ -107,10 +122,9 @@ export async function GET() {
         policy: {
           // Using optional chaining (?.allocated) and fallback values (??)
           // to prevent crashes on legacy documents missing nested sub-objects.
-          ANNUAL: balance?.ANNUAL?.allocated ?? 15,
-          SICK: balance?.SICK?.allocated ?? 8,
-          CASUAL: balance?.CASUAL?.allocated ?? 6,
-          MONTHLY: balance?.MONTHLY?.allocated ?? 2,
+          ANNUAL: balance?.ANNUAL?.allocated ?? defaults.ANNUAL,
+          SICK: balance?.SICK?.allocated ?? defaults.SICK,
+          CASUAL: balance?.CASUAL?.allocated ?? defaults.CASUAL,
         },
       };
     }).filter((emp) => emp.userId !== ""); // Filter out null userId objects safely
@@ -137,7 +151,7 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { userId, ANNUAL, SICK, CASUAL, MONTHLY } = body;
+    const { userId, ANNUAL, SICK, CASUAL } = body;
 
     if (!userId) {
       return NextResponse.json({ error: "User ID is required." }, { status: 400 });
@@ -146,13 +160,11 @@ export async function POST(req: Request) {
     const annualNum = Number(ANNUAL);
     const sickNum = Number(SICK);
     const casualNum = Number(CASUAL);
-    const monthlyNum = Number(MONTHLY);
 
     if (
       isNaN(annualNum) || annualNum < 0 ||
       isNaN(sickNum) || sickNum < 0 ||
-      isNaN(casualNum) || casualNum < 0 ||
-      isNaN(monthlyNum) || monthlyNum < 0
+      isNaN(casualNum) || casualNum < 0
     ) {
       return NextResponse.json({ error: "All leave values must be non-negative integers." }, { status: 400 });
     }
@@ -160,7 +172,7 @@ export async function POST(req: Request) {
     // 1. Update the employee custom configuration
     const updatedCustomPolicy = await EmployeeLeavePolicy.findOneAndUpdate(
       { userId },
-      { $set: { ANNUAL: annualNum, SICK: sickNum, CASUAL: casualNum, MONTHLY: monthlyNum } },
+      { $set: { ANNUAL: annualNum, SICK: sickNum, CASUAL: casualNum } },
       { upsert: true, new: true }
     );
 
@@ -172,8 +184,12 @@ export async function POST(req: Request) {
           "ANNUAL.allocated": annualNum,
           "SICK.allocated": sickNum,
           "CASUAL.allocated": casualNum,
-          "MONTHLY.allocated": monthlyNum,
           customPolicy: true,
+          // An explicit custom allowance overrides any mid-year proration, so
+          // record it as the full annual value and clear the proration flag to
+          // keep the yearly reset consistent.
+          annualFullAllocation: annualNum,
+          proratedForYear: null,
         }
       },
       { upsert: true }
@@ -210,6 +226,14 @@ export async function DELETE(req: Request) {
     if (!userId) {
       return NextResponse.json({ error: "User ID is required to remove parameters." }, { status: 400 });
     }
+    const globalPolicy = (await GlobalLeavePolicy.findOne({ key: "default" }).lean()) as unknown as
+      | GlobalPolicyValues
+      | null;
+    const defaults = {
+      ANNUAL: globalPolicy?.ANNUAL ?? 15,
+      SICK: globalPolicy?.SICK ?? 8,
+      CASUAL: globalPolicy?.CASUAL ?? 6,
+    };
 
     // 1. Delete custom limit record
     await EmployeeLeavePolicy.findOneAndDelete({ userId });
@@ -219,11 +243,14 @@ export async function DELETE(req: Request) {
       { userId },
       {
         $set: {
-          "ANNUAL.allocated": 15,
-          "SICK.allocated": 8,
-          "CASUAL.allocated": 6,
-          "MONTHLY.allocated": 2,
+          "ANNUAL.allocated": defaults.ANNUAL,
+          "SICK.allocated": defaults.SICK,
+          "CASUAL.allocated": defaults.CASUAL,
           customPolicy: false,
+          // Reverting to the standard baseline also clears any mid-year
+          // proration bookkeeping so the yearly reset stays consistent.
+          annualFullAllocation: defaults.ANNUAL,
+          proratedForYear: null,
         }
       }
     );

@@ -13,7 +13,6 @@ interface EmployeePolicy {
     ANNUAL: number;
     SICK: number;
     CASUAL: number;
-    MONTHLY: number;
   };
 }
 
@@ -24,7 +23,7 @@ interface ManageLeavePolicyModalProps {
   selectedEmployee: EmployeePolicy | null;
   onSave: (
     userId: string,
-    policy: { ANNUAL: number; SICK: number; CASUAL: number; MONTHLY: number }
+    policy: { ANNUAL: number; SICK: number; CASUAL: number }
   ) => Promise<void>;
 }
 
@@ -45,7 +44,6 @@ export default function ManageLeavePolicyModal({
   const [tempAnnual, setTempAnnual] = useState<number | "">("");
   const [tempSick, setTempSick] = useState<number | "">("");
   const [tempCasual, setTempCasual] = useState<number | "">("");
-  const [tempMonthly, setTempMonthly] = useState<number | "">("");
 
   // UI States
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -55,7 +53,6 @@ export default function ManageLeavePolicyModal({
     setTempAnnual(15);
     setTempSick(8);
     setTempCasual(6);
-    setTempMonthly(2);
     setDropdownSearch("");
     setLocalBanner(null);
   };
@@ -74,7 +71,6 @@ export default function ManageLeavePolicyModal({
       setTempAnnual(initialSelectedEmployee.policy.ANNUAL);
       setTempSick(initialSelectedEmployee.policy.SICK);
       setTempCasual(initialSelectedEmployee.policy.CASUAL);
-      setTempMonthly(initialSelectedEmployee.policy.MONTHLY ?? 2);
     } else {
       setSelectedEmp(null);
       resetForm();
@@ -111,7 +107,6 @@ export default function ManageLeavePolicyModal({
     setTempAnnual(emp.policy.ANNUAL);
     setTempSick(emp.policy.SICK);
     setTempCasual(emp.policy.CASUAL);
-    setTempMonthly(emp.policy.MONTHLY ?? 2);
     setIsDropdownOpen(false);
     setDropdownSearch("");
   };
@@ -129,7 +124,6 @@ export default function ManageLeavePolicyModal({
         ANNUAL: Number(tempAnnual || 0),
         SICK: Number(tempSick || 0),
         CASUAL: Number(tempCasual || 0),
-        MONTHLY: Number(tempMonthly || 0),
       });
       showBanner("success", `Leave policy updated successfully for ${selectedEmp.name}`);
     } catch (err) {
@@ -157,32 +151,31 @@ export default function ManageLeavePolicyModal({
   );
 
   const inputClass =
-    "w-full px-3.5 py-2.5 bg-surface-card border border-line-subtle rounded-xl text-xs text-content-main placeholder-content-muted transition-all duration-200 shadow-sm outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500";
+    "w-full px-3.5 py-2.5 bg-surface-card border border-line-subtle rounded-xl text-xs text-content-main placeholder-content-muted transition-all duration-200 shadow-sm outline-none hover:border-brand-accent/50 focus:ring-2 focus:ring-brand-accent/20 focus:border-brand-accent";
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop click to close */}
-      <div className="absolute inset-0" onClick={onClose} />
+      <div className="absolute inset-0 bg-content-main/40 backdrop-blur-xs transition-opacity" onClick={onClose} />
 
       {/* Modal Container */}
-      <div className="relative w-full max-w-md bg-white border border-[#e2e0e8] rounded-2xl shadow-2xl p-6 flex flex-col overflow-visible z-10 transition-transform scale-100">
-        
+      <div className="relative w-full max-w-md bg-surface-card border border-line-subtle rounded-2xl shadow-2xl p-6 flex flex-col overflow-visible z-10 animate-in fade-in zoom-in-95 duration-150">
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+          className="absolute top-4 right-4 p-1.5 text-content-muted hover:text-brand-accent hover:bg-brand-subtle rounded-lg transition-colors cursor-pointer"
         >
           <X className="w-4 h-4" />
         </button>
 
         {/* Modal Header */}
-        <div className="mb-5">
-          <h3 className="text-sm font-extrabold text-[#181124] uppercase tracking-wider">
+        <div className="mb-5 pr-8">
+          <h3 className="text-sm font-extrabold text-content-main uppercase tracking-wider">
             {initialSelectedEmployee ? "Edit Leave Override" : "Create Leave Override"}
           </h3>
-          <p className="text-[10px] text-gray-500 mt-1 font-medium">
+          <p className="text-[10px] text-content-muted mt-1 font-medium">
             Tailor leave thresholds for the selected employee profile.
           </p>
         </div>
@@ -288,7 +281,7 @@ export default function ManageLeavePolicyModal({
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-gray-500">Annual Leaves</label>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">Annual Leaves</label>
                 <input
                   type="number"
                   min={0}
@@ -301,7 +294,7 @@ export default function ManageLeavePolicyModal({
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-gray-500">Sick Leaves</label>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">Sick Leaves</label>
                 <input
                   type="number"
                   min={0}
@@ -314,7 +307,7 @@ export default function ManageLeavePolicyModal({
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-gray-500">Casual Leaves</label>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">Casual Leaves</label>
                 <input
                   type="number"
                   min={0}
@@ -325,33 +318,20 @@ export default function ManageLeavePolicyModal({
                   className={inputClass}
                 />
               </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-indigo-600">Monthly Limit</label>
-                <input
-                  type="number"
-                  min={0}
-                  required
-                  value={tempMonthly}
-                  placeholder="0"
-                  onChange={(e) => handleNumericInput(e.target.value, setTempMonthly)}
-                  className={`${inputClass} border-indigo-200 focus:border-indigo-500`}
-                />
-              </div>
             </div>
 
             <div className="flex gap-2 pt-2">
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 px-4 py-2.5 text-xs font-bold text-gray-700 bg-gray-50 border border-gray-200 hover:bg-gray-100 rounded-xl transition cursor-pointer text-center"
+                className="flex-1 px-4 py-2.5 text-xs font-bold text-content-secondary bg-surface-main hover:bg-brand-subtle hover:text-brand-accent rounded-xl border border-line-subtle transition cursor-pointer text-center"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="flex-1 px-4 py-2.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-xs transition cursor-pointer disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
+                className="flex-1 px-4 py-2.5 text-xs font-bold text-white bg-brand-accent hover:bg-brand-hover rounded-xl shadow-xs transition cursor-pointer disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
               >
                 <Save className="w-3.5 h-3.5" />
                 <span>{isSubmitting ? "Saving..." : "Apply Config"}</span>

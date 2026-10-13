@@ -16,7 +16,6 @@ const CompanyDetailsSchema = new Schema(
     checkInDisplayBefore: { type: Number, default: 30 }, // Minutes before shiftStart to show button
     checkOutDisplayAfter: { type: Number, default: 0 },  // Minutes after shiftEnd to show button
     autoCheckOut: { type: Boolean, default: false },    // Is Auto Check-out active (checkbox)
-    autoCheckOutBuffer: { type: Number, default: 30, min: 0, max: 30 }, // Buffer in minutes (max 30)
     // Payslip PDF branding (signature / stamp for print-ready receipts)
     payslipHeadName: { type: String, default: "" },
     payslipHeadTitle: { type: String, default: "Authorized Signatory" },

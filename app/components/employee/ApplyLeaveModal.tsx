@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
-import { X, ChevronDown, AlertTriangle } from "lucide-react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
+import { X, ChevronDown, AlertTriangle, CalendarCheck, Clock } from "lucide-react";
 
 interface ApplyLeaveModalProps {
   isOpen: boolean;
   onClose: () => void;
+  canRequestLeave?: boolean;
   onSubmit: (formData: {
     type: "ANNUAL" | "SICK" | "CASUAL";
     startDate: string;
@@ -20,22 +21,58 @@ const LEAVE_TYPES = [
   { value: "CASUAL" as const, label: "Casual Leave" },
 ];
 
-export default function ApplyLeaveModal({ isOpen, onClose, onSubmit }: ApplyLeaveModalProps) {
+// Number of days in advance required for Annual & Casual leaves
+const ADVANCE_NOTICE_DAYS = 2;
+
+export default function ApplyLeaveModal({
+  isOpen,
+  onClose,
+  onSubmit,
+  canRequestLeave = true,
+}: ApplyLeaveModalProps) {
   const [form, setForm] = useState({
     type: "ANNUAL" as "ANNUAL" | "SICK" | "CASUAL",
     startDate: "",
     endDate: "",
     reason: "",
   });
-  
+
   const [loading, setLoading] = useState(false);
   const [validationError, setValidationError] = useState("");
   const [isTypeOpen, setIsTypeOpen] = useState(false);
 
-  // Ref to track clicks outside the leave type selector
   const typeRef = useRef<HTMLDivElement>(null);
 
-  // Clear states when opening/closing modal (render-time adjustment pattern)
+  // Compute today's date in Karachi timezone (YYYY-MM-DD)
+  const todayString = useMemo(() => {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Karachi",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+  }, []);
+
+  // Compute minimum date for Annual / Casual leaves (Today + 2 days)
+  const minPlannedDateString = useMemo(() => {
+    const [year, month, day] = todayString.split("-").map(Number);
+    const date = new Date(Date.UTC(year, month - 1, day));
+    date.setUTCDate(date.getUTCDate() + ADVANCE_NOTICE_DAYS);
+    return date.toISOString().split("T")[0];
+  }, [todayString]);
+
+  // Formatted display date for policy info (e.g., "Oct 11, 2026")
+  const formattedMinPlannedDate = useMemo(() => {
+    return new Date(`${minPlannedDateString}T00:00:00`).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  }, [minPlannedDateString]);
+
+  const isSickLeave = form.type === "SICK";
+
+  // Reset or initialize state when opening modal
   const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
   if (isOpen !== prevIsOpen) {
     setPrevIsOpen(isOpen);
@@ -46,14 +83,13 @@ export default function ApplyLeaveModal({ isOpen, onClose, onSubmit }: ApplyLeav
     }
   }
 
-  // Click outside listener for the custom dropdown
+  // Click-outside listener for the leave type dropdown
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (typeRef.current && !typeRef.current.contains(event.target as Node)) {
         setIsTypeOpen(false);
       }
     }
-
     if (isTypeOpen) {
       document.addEventListener("mousedown", handleClickOutside);
     }
@@ -62,7 +98,42 @@ export default function ApplyLeaveModal({ isOpen, onClose, onSubmit }: ApplyLeav
     };
   }, [isTypeOpen]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !canRequestLeave) return null;
+
+  // Handles type change and automatically updates dates if switching types
+  const handleTypeChange = (newType: "ANNUAL" | "SICK" | "CASUAL") => {
+    setIsTypeOpen(false);
+    setValidationError("");
+
+    setForm((prev) => {
+      let updatedStart = prev.startDate;
+      let updatedEnd = prev.endDate;
+
+      if (newType !== "SICK" && updatedStart && updatedStart < minPlannedDateString) {
+        updatedStart = minPlannedDateString;
+        if (updatedEnd && updatedEnd < minPlannedDateString) {
+          updatedEnd = minPlannedDateString;
+        }
+      }
+
+      return {
+        ...prev,
+        type: newType,
+        startDate: updatedStart,
+        endDate: updatedEnd,
+      };
+    });
+  };
+
+  const handleStartDateChange = (val: string) => {
+    setForm((prev) => {
+      const next = { ...prev, startDate: val };
+      if (prev.endDate && prev.endDate < val) {
+        next.endDate = val;
+      }
+      return next;
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,11 +144,21 @@ export default function ApplyLeaveModal({ isOpen, onClose, onSubmit }: ApplyLeav
       return;
     }
 
-    // Logic to prevent start date from occurring after the end date
-    const start = new Date(form.startDate);
-    const end = new Date(form.endDate);
-    if (start > end) {
+    if (form.startDate < todayString) {
+      setValidationError("Leave start date cannot be in the past.");
+      return;
+    }
+
+    if (form.startDate > form.endDate) {
       setValidationError("Start date cannot occur after the end date.");
+      return;
+    }
+
+    // 2-day advance check for Annual and Casual leaves
+    if (!isSickLeave && form.startDate < minPlannedDateString) {
+      setValidationError(
+        `${form.type === "ANNUAL" ? "Annual" : "Casual"} leave must be applied at least ${ADVANCE_NOTICE_DAYS} days in advance (Earliest allowed: ${formattedMinPlannedDate}).`
+      );
       return;
     }
 
@@ -92,43 +173,48 @@ export default function ApplyLeaveModal({ isOpen, onClose, onSubmit }: ApplyLeav
       setForm({ type: "ANNUAL", startDate: "", endDate: "", reason: "" });
       onClose();
     } catch (error) {
-      console.error("Failed to submit request", error);
-      setValidationError("An error occurred. Please try again.");
+      const msg = error instanceof Error ? error.message : "Failed to submit request.";
+      setValidationError(msg);
     } finally {
       setLoading(false);
     }
   };
 
-  // Helper mapping validation error borders to fields
   const getInputClass = (hasError = false) => {
-    const baseClass = "w-full px-3.5 py-2.5 bg-surface-card border rounded-xl text-xs text-content-main placeholder-content-muted transition-all duration-200 shadow-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed";
-    const normalClass = "border-line-subtle hover:border-brand-accent/50 focus:ring-2 focus:ring-brand-accent/20 focus:border-brand-accent";
-    const errorClass = "border-rose-300 bg-rose-50/10 text-rose-900 hover:border-rose-400 focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500";
-    
-    return `${baseClass} ${hasError ? errorClass : normalClass}`;
+    const base =
+      "w-full px-3.5 py-2.5 bg-surface-card border rounded-xl text-xs text-content-main placeholder-content-muted transition-all duration-200 shadow-xs outline-none disabled:opacity-50 disabled:cursor-not-allowed";
+    const normal =
+      "border-line-subtle hover:border-brand-accent/50 focus:ring-2 focus:ring-brand-accent/20 focus:border-brand-accent";
+    const error =
+      "border-rose-300 bg-rose-50/10 text-rose-900 hover:border-rose-400 focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500";
+    return `${base} ${hasError ? error : normal}`;
   };
 
   const selectedTypeLabel = LEAVE_TYPES.find((t) => t.value === form.type)?.label || "Annual Leave";
 
+  // Earliest start date allowed: Today for Sick, 2 days in advance for Annual/Casual
+  const minStartDate = isSickLeave ? todayString : minPlannedDateString;
+  const minEndDate = form.startDate || minStartDate;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-slate-900/35 backdrop-blur-xs transition-opacity" 
-        onClick={onClose} 
+      <div
+        className="absolute inset-0 bg-slate-900/35 backdrop-blur-xs transition-opacity"
+        onClick={onClose}
       />
 
       {/* Modal Container */}
       <div className="relative bg-surface-card border border-line-subtle rounded-2xl max-w-md w-full p-6 shadow-2xl z-20 animate-in fade-in zoom-in-95 duration-150">
-        
-        {/* Subtle purple accent line at the top */}
         <div className="absolute top-0 inset-x-0 h-1 bg-linear-to-r from-brand-accent to-brand-hover" />
 
-        {/* Modal Header */}
+        {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-line-subtle">
           <div>
             <h2 className="text-base font-extrabold text-content-main tracking-tight">Request Leave</h2>
-            <p className="text-[11px] text-content-secondary mt-0.5 font-medium">Prepare details to queue leave request.</p>
+            <p className="text-[11px] text-content-secondary mt-0.5 font-medium">
+              Specify your leave type and dates.
+            </p>
           </div>
           <button
             onClick={onClose}
@@ -138,44 +224,38 @@ export default function ApplyLeaveModal({ isOpen, onClose, onSubmit }: ApplyLeav
           </button>
         </div>
 
-        {/* Modal Form */}
+        {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4 pt-4">
-          
-          {/* Friendly Validation Alert Box */}
           {validationError && (
-            <div className="flex items-start gap-3 p-3.5 bg-rose-50/75 border border-rose-100 rounded-xl text-rose-800 animate-in fade-in slide-in-from-top-1 duration-200">
-              <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-              <div>
-                <h4 className="text-xs font-bold">Validation Notice</h4>
-                <p className="text-[11px] text-rose-600/90 mt-0.5 font-medium">{validationError}</p>
-              </div>
+            <div className="flex items-start gap-2.5 p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 animate-in fade-in slide-in-from-top-1 duration-150">
+              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+              <div className="text-[11px] font-medium leading-relaxed">{validationError}</div>
             </div>
           )}
 
-          {/* Custom Styled Leave Type Dropdown */}
+          {/* Leave Type Dropdown */}
           <div className="space-y-1.5 relative" ref={typeRef}>
-            <label className="field-label block">
-              Select Leave Type
-            </label>
+            <label className="field-label block">Select Leave Type</label>
             <button
               type="button"
               onClick={() => setIsTypeOpen(!isTypeOpen)}
-              className={`${getInputClass()} flex items-center justify-between text-left cursor-pointer z-40 relative`}
+              className={`${getInputClass()} flex items-center justify-between text-left cursor-pointer z-20 relative`}
             >
-              <span>{selectedTypeLabel}</span>
-              <ChevronDown className={`w-3.5 h-3.5 text-content-muted transition-transform duration-200 ${isTypeOpen ? "rotate-180" : ""}`} />
+              <span className="font-semibold">{selectedTypeLabel}</span>
+              <ChevronDown
+                className={`w-3.5 h-3.5 text-content-muted transition-transform duration-200 ${
+                  isTypeOpen ? "rotate-180" : ""
+                }`}
+              />
             </button>
 
             {isTypeOpen && (
-              <div className="dropdown-panel absolute left-0 right-0 mt-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
+              <div className="dropdown-panel absolute left-0 right-0 mt-1.5 z-30 animate-in fade-in slide-in-from-top-1 duration-150">
                 {LEAVE_TYPES.map((type) => (
                   <button
                     key={type.value}
                     type="button"
-                    onClick={() => {
-                      setForm({ ...form, type: type.value });
-                      setIsTypeOpen(false);
-                    }}
+                    onClick={() => handleTypeChange(type.value)}
                     className={`dropdown-option ${
                       form.type === type.value ? "dropdown-option-active" : ""
                     }`}
@@ -187,52 +267,87 @@ export default function ApplyLeaveModal({ isOpen, onClose, onSubmit }: ApplyLeav
             )}
           </div>
 
+          {/* Context Policy Notice */}
+          <div
+            className={`p-3 rounded-xl border text-xs flex items-start gap-2.5 transition-colors duration-200 ${
+              isSickLeave
+                ? "bg-emerald-50/80 border-emerald-200 text-emerald-900"
+                : "bg-amber-50/80 border-amber-200 text-amber-900"
+            }`}
+          >
+            {isSickLeave ? (
+              <Clock className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+            ) : (
+              <CalendarCheck className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            )}
+            <div className="text-[11px] leading-relaxed">
+              {isSickLeave ? (
+                <span>
+                  <strong className="font-bold">Immediate Request:</strong> Sick leave can be requested starting today without 2-day advance notice.
+                </span>
+              ) : (
+                <span>
+                  <strong className="font-bold">2-Day Advance Notice Required:</strong> {selectedTypeLabel} must be requested at least {ADVANCE_NOTICE_DAYS} days in advance. Earliest start date is{" "}
+                  <span className="font-bold underline">{formattedMinPlannedDate}</span>.
+                </span>
+              )}
+            </div>
+          </div>
+
           {/* Date Grid */}
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label className="field-label block">
-                Start Date
-              </label>
+            <div className="space-y-1">
+              <label className="field-label block">Start Date</label>
               <input
                 type="date"
                 required
                 value={form.startDate}
-                onChange={(e) => setForm({ ...form, startDate: e.target.value })}
-                className={`${getInputClass(!!validationError && (!form.startDate || new Date(form.startDate) > new Date(form.endDate)))} cursor-pointer`}
+                min={minStartDate}
+                onChange={(e) => handleStartDateChange(e.target.value)}
+                className={`${getInputClass(
+                  !!validationError &&
+                    (!form.startDate || (!isSickLeave && form.startDate < minPlannedDateString))
+                )} cursor-pointer`}
               />
+              <span className="text-[10px] text-content-muted block pl-0.5">
+                {isSickLeave ? `Today (${todayString}) onwards` : `Min: ${minPlannedDateString}`}
+              </span>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="field-label block">
-                End Date
-              </label>
+            <div className="space-y-1">
+              <label className="field-label block">End Date</label>
               <input
                 type="date"
                 required
                 value={form.endDate}
+                min={minEndDate}
                 onChange={(e) => setForm({ ...form, endDate: e.target.value })}
-                className={`${getInputClass(!!validationError && (!form.endDate || new Date(form.startDate) > new Date(form.endDate)))} cursor-pointer`}
+                className={`${getInputClass(
+                  !!validationError &&
+                    (!form.endDate || (!!form.startDate && form.endDate < form.startDate))
+                )} cursor-pointer`}
               />
+              <span className="text-[10px] text-content-muted block pl-0.5">
+                {form.startDate ? `On or after ${form.startDate}` : "Select start date first"}
+              </span>
             </div>
           </div>
 
-          {/* Reason details */}
+          {/* Reason */}
           <div className="space-y-1.5">
-            <label className="field-label block">
-              Leave Reason Details
-            </label>
+            <label className="field-label block">Leave Reason Details</label>
             <textarea
               rows={3}
               required
-              placeholder="Provide supporting notes for your request..."
+              placeholder="State the reason for taking leave..."
               value={form.reason}
               onChange={(e) => setForm({ ...form, reason: e.target.value })}
               className={`${getInputClass(!!validationError && !form.reason.trim())} resize-none leading-relaxed`}
             />
           </div>
 
-          {/* Footer Actions */}
-          <div className="flex justify-end items-center gap-2 pt-4 border-t border-line-subtle shrink-0">
+          {/* Actions */}
+          <div className="flex justify-end items-center gap-2 pt-4 border-t border-line-subtle">
             <button
               type="button"
               onClick={onClose}
@@ -244,7 +359,7 @@ export default function ApplyLeaveModal({ isOpen, onClose, onSubmit }: ApplyLeav
             <button
               type="submit"
               disabled={loading}
-              className="px-4.5 py-2.5 text-xs font-bold text-white bg-brand-accent hover:bg-brand-hover rounded-xl shadow-xs hover:shadow-md transition duration-150 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+              className="px-4.5 py-2.5 text-xs font-bold text-white bg-brand-accent hover:bg-brand-hover rounded-xl shadow-xs transition duration-150 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
             >
               {loading ? "Dispatching..." : "Dispatch Request"}
             </button>
