@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import useSWR from "swr";
 import Swal from "sweetalert2";
 import { 
@@ -11,10 +11,6 @@ import {
   X, 
   CheckCircle2,
   CalendarDays,
-  AlertCircle,
-  AlertTriangle,
-  LogIn,
-  LogOut,
   ChevronDown,
   UserMinus,
   Activity
@@ -87,10 +83,6 @@ export default function EmployeeDashboardPage() {
   const leaveTypeRef = useRef<HTMLDivElement>(null);
 
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
-  const [attendanceError, setAttendanceError] = useState<string | null>(null);
-
-  const [isSunday, setIsSunday] = useState(false);
-  const [isWithinWindow, setIsWithinWindow] = useState(false);
 
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [isLeaveTypeDropdownOpen, setIsLeaveTypeDropdownOpen] = useState(false);
@@ -103,34 +95,11 @@ export default function EmployeeDashboardPage() {
     reason: "",
   });
 
-  const evaluateTimeConstraints = useCallback(() => {
-    const now = new Date();
-    const day = now.getDay();
-    
-    if (day === 0) {
-      setIsSunday(true);
-      setIsWithinWindow(false);
-      return;
-    }
-    
-    setIsSunday(false);
-    const hours = now.getHours();
-    const minutes = now.getMinutes();
-    const currentMins = hours * 60 + minutes;
-
-    const startLimit = 11 * 60 + 30;
-    const endLimit = 20 * 60 + 30;
-
-    setIsWithinWindow(currentMins >= startLimit && currentMins <= endLimit);
-  }, []);
-
   // All dashboard data comes through SWR: fetched in parallel, cached across
   // employee pages (attendance / leaves / payslips reuse the same keys), and
   // revalidated in the background — revisits render instantly.
   const {
     data: attendanceData,
-    isLoading: attendanceLoading,
-    mutate: refreshAttendance,
   } = useSWR<{
     todayRecord?: TodayAttendanceRecord | null;
     monthlyRecord?: { presentDays?: number; absentDays?: number; totalWorkingHours?: number } | null;
@@ -200,38 +169,6 @@ export default function EmployeeDashboardPage() {
     return leaves.filter((l) => String(l?.status || "").toUpperCase() === "PENDING").length;
   }, [leavesData]);
 
-  const handleAttendanceAction = async (actionType: "check-in" | "check-out") => {
-    try {
-      setAttendanceError(null);
-      const res = await fetch("/api/employee/attendance", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: actionType }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setAttendanceError(data.error || "Action execution failed.");
-      } else {
-        await refreshAttendance();
-      }
-    } catch {
-      setAttendanceError("A communication error occurred with the server.");
-    }
-  };
-
-  useEffect(() => {
-    const initial = setTimeout(evaluateTimeConstraints, 0);
-    const timer = setInterval(() => {
-      evaluateTimeConstraints();
-    }, 15000);
-
-    return () => {
-      clearTimeout(initial);
-      clearInterval(timer);
-    };
-  }, [evaluateTimeConstraints]);
-
   useEffect(() => {
     function handleOutsideClick(event: MouseEvent) {
       if (leaveTypeRef.current && !leaveTypeRef.current.contains(event.target as Node)) {
@@ -298,7 +235,6 @@ export default function EmployeeDashboardPage() {
     }
   };
 
-  const isShiftButtonsDisabled = isSunday || !isWithinWindow;
   const attendanceProgressPercentage = Math.min(100, Math.round((presentDays / 30) * 100));
 
   return (
@@ -443,89 +379,25 @@ export default function EmployeeDashboardPage() {
           <div className="rounded-2xl border border-line-subtle bg-surface-card p-5 space-y-5">
             <div>
               <h3 className="text-sm font-bold text-content-main">Shift Activity Panel</h3>
-              <p className="text-[11px] text-content-secondary mt-0.5">Register daily workspace entries or request planned leaves.</p>
+              <p className="text-[11px] text-content-secondary mt-0.5">Request planned leave. Attendance punches come from the fingerprint device.</p>
             </div>
 
-            {isSunday && (
-              <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                <span className="text-[11px] leading-snug font-medium text-amber-800">
-                  Today is Sunday. Weekly off, attendance operations are locked.
-                </span>
-              </div>
-            )}
-
-            {!isSunday && !isWithinWindow && (
-              <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                <span className="text-[11px] leading-snug font-medium text-amber-800">
-                  Interactive panel is open only within shift margins (11:30 AM to 08:30 PM).
-                </span>
-              </div>
-            )}
-
-            {attendanceError && (
-              <div className="w-full flex items-start gap-2 p-3 rounded-xl bg-rose-50 border border-rose-200 text-left">
-                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-                <span className="text-[11px] leading-snug font-medium text-rose-800">{attendanceError}</span>
-              </div>
-            )}
-
-            <div className="p-4 bg-surface-main rounded-xl border border-line-subtle space-y-4">
+            <div className="p-4 bg-surface-main rounded-xl border border-line-subtle">
               <div className="flex items-start gap-3">
                 <div className="p-2 bg-surface-card border border-line-subtle rounded-lg text-brand-accent mt-0.5">
                   <Fingerprint className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="font-bold text-xs text-content-main block">Self Service Shifts</span>
-                  {todayRecord ? (
-                    <p className="text-[11px] text-content-secondary mt-0.5">
-                      Active checked-in session tracked for today.
-                    </p>
-                  ) : (
-                    <p className="text-[11px] text-content-secondary mt-0.5">
-                      Register today&apos;s clock-in time to update database logs.
-                    </p>
-                  )}
+                  <span className="font-bold text-xs text-content-main block">Fingerprint Attendance</span>
+                  <p className="text-[11px] text-content-secondary mt-0.5">
+                    {todayRecord?.checkOut
+                      ? "Today's check-out is already recorded."
+                      : todayRecord
+                        ? "Today's check-in is recorded. Check-out will come from the device."
+                        : "Check-in and check-out are recorded on the office fingerprint device."}
+                  </p>
                 </div>
               </div>
-
-              {attendanceLoading ? (
-                <div className="text-center py-2 text-[11px] text-content-muted">
-                  Checking database shift parameters...
-                </div>
-              ) : !todayRecord ? (
-                <button
-                  disabled={isShiftButtonsDisabled}
-                  onClick={() => handleAttendanceAction("check-in")}
-                  className={`w-full py-2.5 px-3 rounded-xl text-xs font-bold transition-all duration-150 flex items-center justify-center gap-2 ${
-                    isShiftButtonsDisabled 
-                      ? "bg-surface-main text-content-muted border border-line-subtle cursor-not-allowed" 
-                      : "bg-brand-accent hover:bg-brand-hover text-white shadow-xs cursor-pointer"
-                  }`}
-                >
-                  <LogIn className="w-3.5 h-3.5" />
-                  <span>Register Daily Check-In</span>
-                </button>
-              ) : !todayRecord.checkOut ? (
-                <button
-                  disabled={isShiftButtonsDisabled}
-                  onClick={() => handleAttendanceAction("check-out")}
-                  className={`w-full py-2.5 px-3 rounded-xl text-xs font-bold transition-all duration-150 flex items-center justify-center gap-2 ${
-                    isShiftButtonsDisabled 
-                      ? "bg-surface-main text-content-muted border border-line-subtle cursor-not-allowed" 
-                      : "bg-rose-600 hover:bg-rose-700 text-white shadow-xs cursor-pointer"
-                  }`}
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                  <span>Register Daily Check-Out</span>
-                </button>
-              ) : (
-                <div className="p-3 rounded-xl text-center text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center justify-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span>Daily Session Completed</span>
-                </div>
-              )}
             </div>
 
             <button

@@ -15,7 +15,6 @@ import {
 import { StatCard } from "@/app/components/admin/StatCard";
 import AddEmployeeModal from "@/app/components/admin/employees/AddEmployeeModal";
 import Link from "next/link";
-import { RecentActivityPanel } from "@/app/components/admin/RecentActivityPanel";
 import BirthdayCelebrationsCard from "@/app/components/admin/dashbord/BirthdayCelebrationsCard";
 import UpcomingBirthdaysCard, {
   UpcomingBirthday,
@@ -181,7 +180,7 @@ export default function AdminDashboardPage() {
       <div className="px-2 py-6 space-y-6 w-full">
         
         {/* Dashboard Header Section */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-6 border-b border-line-subtle">
+        <div className="flex flex-col gap-4 border-b border-line-subtle pb-6 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <div className="flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-brand-accent animate-pulse" />
@@ -202,8 +201,8 @@ export default function AdminDashboardPage() {
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="inline-flex items-center gap-2 px-3.5 py-2 bg-surface-card border border-line-subtle rounded-xl text-xs font-bold text-brand-accent shadow-sm">
+          <div className="flex w-full shrink-0 sm:w-auto">
+            <div className="inline-flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-line-subtle bg-surface-card px-3.5 py-2 text-xs font-bold text-brand-accent shadow-sm sm:w-auto">
               <Calendar className="w-4 h-4 text-brand-accent" />
               <span>{currentDate || "Loading Date..."}</span>
             </div>
@@ -211,7 +210,7 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* Counter Cards Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {stats.map((stat, idx) => (
             <StatCard
               key={idx}
@@ -230,30 +229,7 @@ export default function AdminDashboardPage() {
         <BirthdayCelebrationsCard celebrants={todayBirthdays} />
         <UpcomingBirthdaysCard upcoming={upcomingBirthdays} />
 
-        {/* Secondary Row: Recent Activities & Quick Actions */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
-          {/* Recent Activities */}
-          <div className="lg:col-span-2 panel p-6 flex flex-col justify-between gap-6 min-w-0">
-            <div className="min-w-0">
-              <div className="flex items-center justify-between pb-4 border-b border-line-subtle">
-                <div>
-                  <h2 className="text-base font-semibold text-content-main">Recent System Activity</h2>
-                  <p className="text-xs text-content-secondary mt-0.5">Real-time log of administrative events.</p>
-                </div>
-                <Link href="/admin/activity" className="text-xs font-semibold text-brand-accent hover:text-brand-hover transition cursor-pointer">
-                  View All Activity
-                </Link>
-              </div>
-
-              <div className="mt-2">
-                <RecentActivityPanel />
-              </div>
-            </div>
-          </div>
-
-          {/* Quick HR Actions Panel */}
-          <div className="lg:col-span-1 panel p-6 space-y-5 flex flex-col justify-between">
+        <div className="panel p-6 space-y-5">
             <div className="space-y-4">
               <div>
                 <h2 className="text-base font-semibold text-content-main">Quick Actions</h2>
@@ -325,7 +301,6 @@ export default function AdminDashboardPage() {
               </div>
             </div>
           </div>
-        </div>
 
         <AddEmployeeModal
           isOpen={isAddModalOpen}

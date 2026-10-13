@@ -4,6 +4,7 @@ import React, { useMemo, useState, useEffect, useRef } from "react";
 import Swal from "sweetalert2";
 import { X, ChevronDown, Clock, CalendarClock, CheckCircle2, AlertCircle } from "lucide-react";
 import { Employee, EmployeeUpdatePayload } from "./EmployeeTable";
+import { addCalendarMonths, durationMonthsOrDefault, parseValidDate } from "@/lib/employment-period";
 
 interface EditEmployeeModalProps {
   isOpen: boolean;
@@ -27,6 +28,21 @@ const EXTENSION_MONTHS = [
   { value: 2, label: "Extend by 2 Months" },
   { value: 3, label: "Extend by 3 Months" },
 ];
+
+function formatPeriodDate(date: Date): string {
+  return date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
+function dateKey(value: Date | string | null | undefined): string {
+  if (!value) return "";
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const parsed = parseValidDate(value);
+  return parsed ? parsed.toISOString().slice(0, 10) : "";
+}
 
 // Custom SweetAlert2 Toast configuration matching the purple design token schema
 const Toast = Swal.mixin({
@@ -164,45 +180,69 @@ export default function EditEmployeeModal({
   }
 
   // Information from employee
-  const isDueReview = employee?.reviewStatus === "Due Review";
   const rawEndDate =
     employee?.periodEndDate ||
     employee?.probationEndDate ||
     employee?.internshipEndDate;
-  const currentEndDate = rawEndDate ? new Date(rawEndDate).toLocaleDateString() : null;
+  const storedEndDate = parseValidDate(rawEndDate);
 
   const isEligibleForReview =
     formData.employmentType === "Internship" || formData.employmentType === "Probation";
 
-  const expectedEndDate = useMemo(() => {
-    if (!isEligibleForReview || !formData.joinDate) return null;
+  const savedDuration =
+    typeof employee?.lifecycleDurationMonths === "number" ? employee.lifecycleDurationMonths : null;
+  const selectedDuration = durationMonthsOrDefault(Number(formData.durationMonths));
+  const durationChanged =
+    savedDuration === null
+      ? selectedDuration !== durationMonthsOrDefault(null)
+      : selectedDuration !== savedDuration;
+  const savedJoinKey = dateKey(
+    employee?.joinDate || employee?.joiningDate || employee?.startDate || employee?.createdAt
+  );
+  const joinChanged = Boolean(formData.joinDate) && savedJoinKey !== formData.joinDate;
+  const scheduleChanged = durationChanged || joinChanged;
 
+  const calculatedEndDate = useMemo(() => {
+    if (!isEligibleForReview || !formData.joinDate) return null;
     const joinDate = new Date(`${formData.joinDate}T00:00:00`);
     if (Number.isNaN(joinDate.getTime())) return null;
+    return addCalendarMonths(joinDate, selectedDuration);
+  }, [formData.joinDate, isEligibleForReview, selectedDuration]);
 
-    const baseDate =
-      reviewAction === "EXTEND" && isDueReview && rawEndDate
-        ? new Date(rawEndDate)
-        : joinDate;
-    if (Number.isNaN(baseDate.getTime())) return null;
+  const reviewEndDate =
+    storedEndDate && !scheduleChanged ? storedEndDate : calculatedEndDate;
+  const isDueReview = Boolean(
+    isEligibleForReview &&
+      ((employee?.reviewStatus === "Due Review" && !scheduleChanged) ||
+        (reviewEndDate && reviewEndDate.getTime() <= Date.now()))
+  );
 
-    const expected = new Date(baseDate);
-    expected.setMonth(
-      expected.getMonth() +
-        (reviewAction === "EXTEND" && isDueReview
-          ? extendMonths
-          : Number(formData.durationMonths))
-    );
-    return expected.toLocaleDateString();
+  const expectedEndDate = useMemo(() => {
+    if (!isEligibleForReview || !calculatedEndDate) return null;
+    if (reviewAction === "EXTEND" && isDueReview) {
+      const extendBase = storedEndDate ?? calculatedEndDate;
+      const base = extendBase.getTime() < Date.now() ? new Date() : extendBase;
+      return addCalendarMonths(base, extendMonths);
+    }
+    return calculatedEndDate;
   }, [
+    calculatedEndDate,
     extendMonths,
-    formData.durationMonths,
-    formData.joinDate,
     isDueReview,
     isEligibleForReview,
-    rawEndDate,
     reviewAction,
+    storedEndDate,
   ]);
+
+  const currentEndLabel = storedEndDate
+    ? formatPeriodDate(storedEndDate)
+    : calculatedEndDate
+      ? formatPeriodDate(calculatedEndDate)
+      : null;
+  const expectedEndLabel = expectedEndDate ? formatPeriodDate(expectedEndDate) : null;
+  const showExpectedChange = Boolean(
+    expectedEndLabel && currentEndLabel && expectedEndLabel !== currentEndLabel
+  );
 
   if (!isOpen || !employee) return null;
 
@@ -327,7 +367,7 @@ export default function EditEmployeeModal({
                 <p className="font-bold text-[11px]">Period Completed / Due Review</p>
                 <p className="text-[10px] text-amber-700/90 mt-0.5">
                   This employee completed their {formData.employmentType} period
-                  {currentEndDate ? ` on ${currentEndDate}` : ""}. You can extend or confirm them below.
+                  {currentEndLabel ? ` on ${currentEndLabel}` : ""}. You can extend or confirm them below.
                 </p>
               </div>
             </div>
@@ -628,19 +668,19 @@ export default function EditEmployeeModal({
                     <CalendarClock className="w-3.5 h-3.5 text-brand-accent" />
                     Review & Period Actions
                   </h4>
-                  {(currentEndDate || expectedEndDate) && (
+                  {(currentEndLabel || expectedEndLabel) && (
                     <p className="text-[10px] text-content-secondary mt-0.5">
                       Current End Date:{" "}
                       <span className="font-bold text-content-main">
-                        {currentEndDate || "Not set"}
+                        {currentEndLabel || "Not set"}
                       </span>
-                      {expectedEndDate && (
+                      {showExpectedChange && (
                         <>
                           {" · "}
                           <span className="font-semibold text-content-secondary">
                             Expected After Changes:{" "}
                           </span>
-                          <span className="font-bold text-content-main">{expectedEndDate}</span>
+                          <span className="font-bold text-content-main">{expectedEndLabel}</span>
                         </>
                       )}
                     </p>

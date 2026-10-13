@@ -28,6 +28,8 @@ interface GeneratePayslipModalProps {
     allowances: number;
     deductions: number;
     bonus: number;
+    tax: number;
+    taxMode: "deduct" | "add";
     netPay: number;
     paymentMethod: string;
     paymentDate: string;
@@ -103,6 +105,8 @@ export default function GeneratePayslipModal({
     allowances: 0,
     deductions: 0,
     bonus: 0,
+    tax: 0,
+    taxMode: "deduct" as "deduct" | "add",
     paymentMethod: "Bank Transfer",
     paymentDate: "",
   });
@@ -189,6 +193,8 @@ export default function GeneratePayslipModal({
         allowances: 0,
         deductions: 0,
         bonus: 0,
+        tax: 0,
+        taxMode: "deduct",
         paymentMethod: "Bank Transfer",
         paymentDate: getLocalTodayDateString(),
       });
@@ -236,6 +242,8 @@ export default function GeneratePayslipModal({
       deductions: autoCalculatedValues.deductions,
       allowances: 0,
       bonus: 0,
+      tax: 0,
+      taxMode: "deduct",
     }));
   };
 
@@ -256,7 +264,9 @@ export default function GeneratePayslipModal({
     }));
   };
 
-  const netPay = formData.basicSalary + formData.allowances + formData.bonus - formData.deductions;
+  const taxEffect = formData.taxMode === "add" ? formData.tax : -formData.tax;
+  const netPay =
+    formData.basicSalary + formData.allowances + formData.bonus - formData.deductions + taxEffect;
   const monthInputBounds = getMonthInputBounds();
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -270,6 +280,10 @@ export default function GeneratePayslipModal({
       setValidationError("Basic Salary must be greater than Rs 0 to record payment.");
       return;
     }
+    if (netPay < 0) {
+      setValidationError("Tax and deductions cannot be more than the total earnings.");
+      return;
+    }
 
     setValidationError("");
 
@@ -280,6 +294,8 @@ export default function GeneratePayslipModal({
       allowances: formData.allowances,
       deductions: formData.deductions,
       bonus: formData.bonus,
+      tax: formData.tax,
+      taxMode: formData.taxMode,
       netPay,
       paymentMethod: formData.paymentMethod,
       paymentDate: formData.paymentDate,
@@ -599,8 +615,72 @@ export default function GeneratePayslipModal({
               </div>
             </div>
 
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-bold text-content-secondary">Income Tax</label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-content-muted">
+                    {currencyPrefix}
+                  </span>
+                  <input
+                    type="number"
+                    name="tax"
+                    min={0}
+                    value={formData.tax || ""}
+                    onChange={handleChange}
+                    placeholder="0"
+                    className={`pl-7 ${getInputClass()}`}
+                  />
+                </div>
+                <p className="text-[10px] text-content-muted">
+                  Shown on the payslip so the employee can see the tax on this salary.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-bold text-content-secondary">Tax Action</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFormData((prev) => ({ ...prev, taxMode: "deduct" }))}
+                    className={`px-3 py-2.5 rounded-xl border text-xs font-bold cursor-pointer ${
+                      formData.taxMode === "deduct"
+                        ? "bg-rose-50 border-rose-300 text-rose-700"
+                        : "bg-surface-card border-line-subtle text-content-secondary"
+                    }`}
+                  >
+                    Deduct from salary
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData((prev) => ({ ...prev, taxMode: "add" }))}
+                    className={`px-3 py-2.5 rounded-xl border text-xs font-bold cursor-pointer ${
+                      formData.taxMode === "add"
+                        ? "bg-emerald-50 border-emerald-300 text-emerald-700"
+                        : "bg-surface-card border-line-subtle text-content-secondary"
+                    }`}
+                  >
+                    Add to salary
+                  </button>
+                </div>
+                <p className="text-[10px] text-content-muted">
+                  {formData.taxMode === "add"
+                    ? "This amount is added on top of the salary."
+                    : "This amount is taken out of the salary before net pay."}
+                </p>
+              </div>
+            </div>
+
             <div className="pt-3 border-t border-line-subtle flex items-center justify-between text-xs">
-              <span className="font-semibold text-content-secondary">Calculated Net Pay:</span>
+              <span className="font-semibold text-content-secondary">
+                Calculated Net Pay
+                {formData.tax > 0
+                  ? formData.taxMode === "add"
+                    ? " (tax added)"
+                    : " (tax deducted)"
+                  : ""}
+                :
+              </span>
               <span className="font-bold text-brand-accent bg-brand-subtle border border-brand-subtle px-2.5 py-1 rounded-lg">
                 Rs.
                 {netPay.toLocaleString(undefined, {

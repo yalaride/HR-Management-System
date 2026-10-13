@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import useSWR from "swr";
+import { useSession } from "next-auth/react";
 import { Plus, RefreshCw, AlertCircle } from "lucide-react";
 
 import AttendanceSummaryCards from "@/app/components/admin/attendance/AttendanceSummaryCards";
@@ -138,6 +139,9 @@ export default function AdminAttendancePage() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+
+  const { data: session } = useSession();
+  const canEditShiftRules = session?.user?.role === "admin";
 
   const [isSyncing, setIsSyncing] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -313,39 +317,39 @@ export default function AdminAttendancePage() {
         </div>
       )}
 
-      <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-6 pb-6 border-b border-line-subtle">
-        <div>
-          <h1 className="text-2xl font-extrabold tracking-tight">On-Site Attendance</h1>
+      <div className="flex flex-col gap-4 border-b border-line-subtle pb-6 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl font-extrabold tracking-tight sm:text-2xl">On-Site Attendance</h1>
           <p className="mt-1 text-xs text-content-secondary">
-            Review today&apos;s attendance, log retro punch entries, and manage shift rules.
+            Review attendance and set check-in or check-out for any employee.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
           <button
             onClick={handleRefreshAttendance}
             disabled={isSyncing}
-            className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-content-main border border-line-subtle rounded-xl text-xs font-bold transition disabled:opacity-50 cursor-pointer"
+            className="inline-flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-line-subtle bg-slate-100 px-4 py-2.5 text-xs font-bold text-content-main transition hover:bg-slate-200 disabled:opacity-50 cursor-pointer sm:w-auto"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin text-brand-accent" : ""}`} />
+            <RefreshCw className={`h-3.5 w-3.5 shrink-0 ${isSyncing ? "animate-spin text-brand-accent" : ""}`} />
             <span>{isSyncing ? "Refreshing..." : "Refresh Attendance"}</span>
           </button>
 
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-brand-accent hover:bg-brand-hover text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
+            className="inline-flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-brand-accent px-4 py-2.5 text-xs font-bold text-white shadow-xs transition hover:bg-brand-hover cursor-pointer sm:w-auto"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="h-4 w-4 shrink-0" />
             <span>Add Manual Attendance</span>
           </button>
         </div>
       </div>
 
-      <div className="flex items-center justify-between border-b border-line-subtle">
-        <div className="flex items-center gap-1">
+      <div className="border-b border-line-subtle">
+        <div className="flex flex-wrap items-center gap-1">
           <button
             onClick={() => setActiveTab("directory")}
-            className={`px-5 py-3 text-xs font-bold border-b-2 transition -mb-px flex items-center gap-2 cursor-pointer ${
+            className={`-mb-px flex items-center gap-2 whitespace-nowrap border-b-2 px-3 py-3 text-xs font-bold transition cursor-pointer sm:px-5 ${
               activeTab === "directory"
                 ? "border-b-brand-accent text-brand-accent"
                 : "border-transparent text-content-secondary hover:text-content-main"
@@ -359,7 +363,7 @@ export default function AdminAttendancePage() {
 
           <button
             onClick={() => setActiveTab("history-drill")}
-            className={`px-5 py-3 text-xs font-bold border-b-2 transition -mb-px flex items-center gap-2 cursor-pointer ${
+            className={`-mb-px flex items-center gap-2 whitespace-nowrap border-b-2 px-3 py-3 text-xs font-bold transition cursor-pointer sm:px-5 ${
               activeTab === "history-drill"
                 ? "border-b-brand-accent text-brand-accent"
                 : "border-transparent text-content-secondary hover:text-content-main"
@@ -368,16 +372,18 @@ export default function AdminAttendancePage() {
             <span>Employee Historical Analytics</span>
           </button>
 
-          <button
-            onClick={() => setActiveTab("rules")}
-            className={`px-5 py-3 text-xs font-bold border-b-2 transition -mb-px flex items-center gap-2 cursor-pointer ${
-              activeTab === "rules"
-                ? "border-b-brand-accent text-brand-accent"
-                : "border-transparent text-content-secondary hover:text-content-main"
-            }`}
-          >
-            <span>Attendance Rules & Visibility</span>
-          </button>
+          {canEditShiftRules && (
+            <button
+              onClick={() => setActiveTab("rules")}
+              className={`-mb-px flex items-center gap-2 whitespace-nowrap border-b-2 px-3 py-3 text-xs font-bold transition cursor-pointer sm:px-5 ${
+                activeTab === "rules"
+                  ? "border-b-brand-accent text-brand-accent"
+                  : "border-transparent text-content-secondary hover:text-content-main"
+              }`}
+            >
+              <span>Attendance Rules & Visibility</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -435,7 +441,7 @@ export default function AdminAttendancePage() {
         />
       )}
 
-      {activeTab === "rules" && companySettings && (
+      {canEditShiftRules && activeTab === "rules" && companySettings && (
         <AttendanceSettings
           data={companySettings}
           onSave={handleSaveSettings}

@@ -36,6 +36,8 @@ interface Payslip {
   allowances: number;
   bonus: number;
   deductions: number;
+  tax?: number;
+  taxMode?: "deduct" | "add";
   netPay: number;
   paymentMethod?: string;
   paymentDate?: string;
@@ -223,6 +225,8 @@ export default function AdminPayslipsPage() {
     allowances: number;
     deductions: number;
     bonus: number;
+    tax: number;
+    taxMode: "deduct" | "add";
     netPay: number;
     paymentMethod: string;
     paymentDate: string;
@@ -385,19 +389,19 @@ export default function AdminPayslipsPage() {
   return (
     <div className="space-y-6 pb-12">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-line-subtle">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-extrabold text-content-main tracking-tight">
+      <div className="flex flex-col gap-4 border-b border-line-subtle pb-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl font-extrabold tracking-tight text-content-main sm:text-2xl">
             Paid Payslips Ledger
           </h1>
-          <p className="mt-1 text-xs text-content-secondary leading-relaxed">
+          <p className="mt-1 text-xs leading-relaxed text-content-secondary">
             Monitor compensations and download official PDF salary statements.
           </p>
         </div>
 
         <button
           onClick={() => setIsModalOpen(true)}
-          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-brand-accent hover:bg-brand-hover text-white text-xs font-bold rounded-xl shadow-xs transition-all duration-150 active:scale-[0.98] cursor-pointer whitespace-nowrap shrink-0"
+          className="inline-flex w-full shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-brand-accent px-5 py-2.5 text-xs font-bold text-white shadow-xs transition-all duration-150 hover:bg-brand-hover active:scale-[0.98] cursor-pointer sm:w-auto"
         >
           <span>Record Payment</span>
         </button>

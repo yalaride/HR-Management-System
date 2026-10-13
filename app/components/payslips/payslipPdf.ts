@@ -27,6 +27,8 @@ export interface PayslipRecord {
   allowances?: number;
   bonus?: number;
   deductions?: number;
+  tax?: number;
+  taxMode?: "deduct" | "add";
   netPay: number;
   paymentMethod?: string;
   paymentDate?: string;
@@ -233,8 +235,12 @@ export async function downloadPayslipPdf({
 
   const refId = getPayslipReferenceId(slip._id);
   const paymentDate = formatPaymentDate(slip.paymentDate);
-  const grossEarnings = slip.basicSalary + (slip.allowances || 0) + (slip.bonus || 0);
-  const grossDeductions = slip.deductions || 0;
+  const taxAmount = Math.max(0, slip.tax || 0);
+  const taxIsAdded = slip.taxMode === "add" && taxAmount > 0;
+  const taxIsDeducted = slip.taxMode !== "add" && taxAmount > 0;
+  const grossEarnings =
+    slip.basicSalary + (slip.allowances || 0) + (slip.bonus || 0) + (taxIsAdded ? taxAmount : 0);
+  const grossDeductions = (slip.deductions || 0) + (taxIsDeducted ? taxAmount : 0);
 
   const logoImg = logoUrl ? await loadImageDataUrl(logoUrl) : null;
   const adjustedLogoDataUrl =
@@ -411,10 +417,20 @@ export async function downloadPayslipPdf({
   if ((slip.bonus || 0) > 0) {
     rows.push({ label: "Bonus / Incentives", amount: slip.bonus || 0, type: "earning" });
   }
+  if (taxIsAdded) {
+    rows.push({ label: "Tax Added", amount: taxAmount, type: "earning" });
+  }
   if ((slip.deductions || 0) > 0) {
     rows.push({
-      label: "Deductions / Tax Withholding",
+      label: "Other Deductions",
       amount: slip.deductions || 0,
+      type: "deduction",
+    });
+  }
+  if (taxIsDeducted) {
+    rows.push({
+      label: "Income Tax Deducted",
+      amount: taxAmount,
       type: "deduction",
     });
   }

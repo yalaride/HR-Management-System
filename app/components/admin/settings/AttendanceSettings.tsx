@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Clock, Edit2, X, CheckCircle2, Loader2, Eye, ShieldAlert } from "lucide-react";
+import { Clock, Edit2, X, CheckCircle2, Loader2, ShieldAlert } from "lucide-react";
 
 interface AttendanceData {
   shiftStart: string;
@@ -36,12 +36,7 @@ export default function AttendanceSettings({ data, onSave, readOnly = false }: A
   // Raw string values for number inputs to preserve leading zeros during editing
   const [rawStringValues, setRawStringValues] = useState<Record<string, string>>({
     gracePeriod: String(data.gracePeriod),
-    checkInDisplayBefore: String(data.checkInDisplayBefore),
-    checkOutDisplayAfter: String(data.checkOutDisplayAfter),
   });
-
-  // Simulator Time state is purely local client-side state (never sent to backend)
-  const [simulatedTime, setSimulatedTime] = useState(data.shiftStart || "08:45");
 
   // Sync local editing state from props when data prop changes
   const [prevData, setPrevData] = useState<AttendanceData | null>(null);
@@ -50,10 +45,7 @@ export default function AttendanceSettings({ data, onSave, readOnly = false }: A
     setTempData({ ...data });
     setRawStringValues({
       gracePeriod: String(data.gracePeriod),
-      checkInDisplayBefore: String(data.checkInDisplayBefore),
-      checkOutDisplayAfter: String(data.checkOutDisplayAfter),
     });
-    setSimulatedTime(data.shiftStart);
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -68,38 +60,6 @@ export default function AttendanceSettings({ data, onSave, readOnly = false }: A
     } finally {
       setSaving(false);
     }
-  };
-
-  // Visibility logic calculations based on active values
-  const checkButtonsVisibility = (timeStr: string) => {
-    const [simH, simM] = timeStr.split(":").map(Number);
-    const [startH, startM] = data.shiftStart.split(":").map(Number);
-    const [endH, endM] = data.shiftEnd.split(":").map(Number);
-
-    const simMin = simH * 60 + simM;
-    const startMin = startH * 60 + startM;
-    const endMin = endH * 60 + endM;
-
-    const checkInOffset = data.checkInDisplayBefore || 30;
-    const canCheckIn = simMin >= (startMin - checkInOffset) && simMin < endMin;
-
-    const checkOutOffset = data.checkOutDisplayAfter || 0;
-    const canCheckOut = simMin >= (endMin + checkOutOffset);
-
-    return { canCheckIn, canCheckOut };
-  };
-
-  const { canCheckIn, canCheckOut } = checkButtonsVisibility(simulatedTime);
-
-  const getReadableTime = (timeStr: string, minutesOffset: number) => {
-    const [h, m] = timeStr.split(":").map(Number);
-    let total = h * 60 + m + minutesOffset;
-    if (total < 0) total += 24 * 60;
-    total = total % (24 * 60);
-    const finalH = Math.floor(total / 60);
-    const finalM = total % 60;
-    const raw = `${String(finalH).padStart(2, "0")}:${String(finalM).padStart(2, "0")}`;
-    return formatTo12Hour(raw);
   };
 
   return (
@@ -192,57 +152,6 @@ export default function AttendanceSettings({ data, onSave, readOnly = false }: A
                   className="form-input text-xs w-full p-2 border border-line-subtle rounded-lg outline-none disabled:opacity-50"
                 />
               </div>
-
-              {/* Persistable Visibility offsets */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-content-secondary">
-                  Show Check-In Button (Minutes Before Shift)
-                </label>
-                <input
-                  type="number"
-                  min={0}
-                  required
-                  value={rawStringValues.checkInDisplayBefore}
-                  onChange={(e) => {
-                    setRawStringValues({ ...rawStringValues, checkInDisplayBefore: e.target.value });
-                    setTempData({ ...tempData, checkInDisplayBefore: Number(e.target.value) || 0 });
-                  }}
-                  className="form-input text-xs w-full p-2 border border-line-subtle rounded-lg outline-none"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-content-secondary">
-                  Show Check-Out Button (Minutes After Shift End)
-                </label>
-                <input
-                  type="number"
-                  min={0}
-                  required
-                  value={rawStringValues.checkOutDisplayAfter}
-                  onChange={(e) => {
-                    setRawStringValues({ ...rawStringValues, checkOutDisplayAfter: e.target.value });
-                    setTempData({ ...tempData, checkOutDisplayAfter: Number(e.target.value) || 0 });
-                  }}
-                  className="form-input text-xs w-full p-2 border border-line-subtle rounded-lg outline-none"
-                />
-              </div>
-
-              {/* Automatic check-out settings */}
-              <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-line-subtle pt-4 mt-2">
-                <div className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    id="autoCheckOut"
-                    checked={tempData.autoCheckOut}
-                    onChange={(e) => setTempData({ ...tempData, autoCheckOut: e.target.checked })}
-                    className="w-4 h-4 rounded text-brand-accent border-line-subtle cursor-pointer"
-                  />
-                  <label htmlFor="autoCheckOut" className="text-xs font-bold text-content-main cursor-pointer">
-                    Enable Auto Check-Out
-                  </label>
-                </div>
-
-              </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-y-6 gap-x-8 py-2">
@@ -258,98 +167,14 @@ export default function AttendanceSettings({ data, onSave, readOnly = false }: A
                   {data.gracePeriod} minutes
                 </span>
               </div>
-              <div>
-                <span className="text-xs font-semibold text-content-secondary">Check-In Active Display Window</span>
-                <span className="text-sm font-semibold text-content-main block mt-0.5">
-                  Appears {data.checkInDisplayBefore} mins before Shift Start
-                </span>
-              </div>
-              <div>
-                <span className="text-xs font-semibold text-content-secondary">Check-Out Active Display Window</span>
-                <span className="text-sm font-semibold text-content-main block mt-0.5">
-                  Appears {data.checkOutDisplayAfter} mins after Shift End
-                </span>
-              </div>
               <div className="md:col-span-2 border-t border-line-subtle pt-4 flex items-center gap-2">
                 <ShieldAlert className="w-4 h-4 text-brand-accent" />
                 <span className="text-xs font-semibold text-content-secondary">
-                  Auto Check-Out is <strong className="text-content-main">{data.autoCheckOut ? "Enabled" : "Disabled"}</strong>
-                  {data.autoCheckOut && " (runs daily at 08:00 PM Asia/Karachi)"}
+                  Check-in and check-out are recorded on the office fingerprint device.
                 </span>
               </div>
             </div>
           )}
-        </div>
-      </div>
-
-      {/* Simulator (Purely Client-Side UI tool) */}
-      <div className="panel bg-surface-subtle border border-line-subtle rounded-2xl p-6">
-        <div className="flex items-center gap-2 pb-4 border-b border-line-subtle">
-          <Eye className="w-5 h-5 text-brand-accent" />
-          <h4 className="text-sm font-bold text-content-main">Employee View Simulator (Local State)</h4>
-        </div>
-
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-          <div className="space-y-3 bg-white p-4 border border-line-subtle rounded-xl">
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-content-secondary">Simulate Clock Time</label>
-              <input
-                type="time"
-                value={simulatedTime}
-                onChange={(e) => setSimulatedTime(e.target.value)}
-                className="form-input text-xs w-full p-2 border border-line-subtle rounded-lg outline-none"
-              />
-            </div>
-            
-            <div className="text-xs space-y-1 text-content-secondary border-t border-line-subtle pt-2.5">
-              <div className="flex justify-between">
-                <span>Check-in active starting at:</span>
-                <span className="font-bold text-emerald-600">
-                  {getReadableTime(data.shiftStart, -(data.checkInDisplayBefore || 0))}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>Check-out active starting at:</span>
-                <span className="font-bold text-amber-600">
-                  {getReadableTime(data.shiftEnd, (data.checkOutDisplayAfter || 0))}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-col items-center justify-center p-6 bg-white border border-line-subtle rounded-xl min-h-[140px] gap-3">
-            <span className="text-xs font-bold text-content-secondary tracking-wide uppercase">
-              Employee Portal Preview ({formatTo12Hour(simulatedTime)})
-            </span>
-            
-            <div className="flex items-center gap-4 w-full justify-center">
-              {canCheckIn ? (
-                <button
-                  type="button"
-                  className="px-4 py-2 bg-emerald-600 text-white font-bold text-xs rounded-xl shadow-md cursor-default transition"
-                >
-                  Check In
-                </button>
-              ) : (
-                <span className="text-xs text-gray-400 bg-gray-50 border border-gray-100 px-3 py-2 rounded-xl italic">
-                  Check-In Hidden
-                </span>
-              )}
-
-              {canCheckOut ? (
-                <button
-                  type="button"
-                  className="px-4 py-2 bg-amber-600 text-white font-bold text-xs rounded-xl shadow-md cursor-default transition"
-                >
-                  Check Out
-                </button>
-              ) : (
-                <span className="text-xs text-gray-400 bg-gray-50 border border-gray-100 px-3 py-2 rounded-xl italic">
-                  Check-Out Hidden
-                </span>
-              )}
-            </div>
-          </div>
         </div>
       </div>
     </div>

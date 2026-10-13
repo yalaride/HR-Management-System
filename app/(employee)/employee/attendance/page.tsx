@@ -1,16 +1,13 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import useSWR from "swr";
 import { 
-  LogIn, 
-  LogOut, 
   Clock, 
   CheckCircle2, 
-  AlertTriangle,
   History,
   Timer,
-  AlertCircle
+  Fingerprint
 } from "lucide-react";
 
 interface AttendanceRecord {
@@ -69,17 +66,6 @@ const DEFAULT_SETTINGS: ActiveSettings = {
 };
 
 export default function EmployeeAttendancePage() {
-  const [actionLoading, setActionLoading] = useState<boolean>(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  const [confirmModal, setConfirmModal] = useState<{
-    isOpen: boolean;
-    action: "check-in" | "check-out" | null;
-  }>({ isOpen: false, action: null });
-
-  const [isSunday, setIsSunday] = useState<boolean>(false);
-  const [isWithinWindow, setIsWithinWindow] = useState<boolean>(false);
-
   // Shares the "/api/employee/attendance" cache with the employee dashboard,
   // so switching between the two pages is instant.
   const {
@@ -97,69 +83,6 @@ export default function EmployeeAttendancePage() {
   const history = useMemo(() => attendanceData?.history || [], [attendanceData]);
   const settings = attendanceData?.settings || DEFAULT_SETTINGS;
 
-  // Timezone-safe evaluation using Asia/Karachi timezone
-  const evaluateTimeConstraints = useCallback(() => {
-    const now = new Date();
-    const formatter = new Intl.DateTimeFormat("en-US", {
-      timeZone: "Asia/Karachi",
-      hour: "numeric",
-      minute: "numeric",
-      weekday: "short",
-      hour12: false,
-    });
-
-    const parts = formatter.formatToParts(now);
-    let hours = 0;
-    let minutes = 0;
-    let dayStr = "";
-
-    for (const part of parts) {
-      if (part.type === "hour") hours = parseInt(part.value, 10) % 24;
-      if (part.type === "minute") minutes = parseInt(part.value, 10);
-      if (part.type === "weekday") dayStr = part.value;
-    }
-
-    if (dayStr === "Sun") {
-      setIsSunday(true);
-      setIsWithinWindow(false);
-      return;
-    }
-
-    setIsSunday(false);
-    const currentMins = hours * 60 + minutes;
-
-    const [startH, startM] = settings.shiftStart.split(":").map(Number);
-    const [endH, endM] = settings.shiftEnd.split(":").map(Number);
-
-    const shiftStartMin = startH * 60 + startM;
-    const shiftEndMin = endH * 60 + endM;
-
-    const checkInOffset = settings.checkInDisplayBefore ?? 30;
-    const checkOutOffset = settings.checkOutDisplayAfter ?? 30;
-
-    const isNightShift = shiftEndMin < shiftStartMin;
-
-    if (!isNightShift) {
-      const startLimit = shiftStartMin - checkInOffset;
-      const endLimit = shiftEndMin + checkOutOffset;
-      setIsWithinWindow(currentMins >= startLimit && currentMins <= endLimit);
-    } else {
-      const startLimit = shiftStartMin - checkInOffset;
-      const endLimit = shiftEndMin + checkOutOffset;
-      setIsWithinWindow(currentMins >= startLimit || currentMins <= endLimit);
-    }
-
-  }, [settings]);
-
-  useEffect(() => {
-    const initial = setTimeout(evaluateTimeConstraints, 0);
-    const interval = setInterval(evaluateTimeConstraints, 15000);
-    return () => {
-      clearTimeout(initial);
-      clearInterval(interval);
-    };
-  }, [settings, evaluateTimeConstraints]);
-
   // Total accumulated working hours excluding Absent days
   const totalAccumulatedHours = useMemo(() => {
     const total = history.reduce((sum, record) => {
@@ -168,30 +91,6 @@ export default function EmployeeAttendancePage() {
     }, 0);
     return Math.round(total * 100) / 100;
   }, [history]);
-
-  const handleAction = async (actionType: "check-in" | "check-out") => {
-    try {
-      setActionLoading(true);
-      setErrorMessage(null);
-
-      const res = await fetch("/api/employee/attendance", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: actionType }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setErrorMessage(data.error || "Action execution failed.");
-      } else {
-        await refreshAttendance();
-      }
-    } catch {
-      setErrorMessage("Network error processing your request.");
-    } finally {
-      setActionLoading(false);
-    }
-  };
 
   const getStatusBadgeStyle = (status: AttendanceRecord["status"]) => {
     switch (status) {
@@ -214,21 +113,6 @@ export default function EmployeeAttendancePage() {
       minute: "2-digit",
       hour12: true,
     }).format(new Date(isoString));
-  };
-
-  const getReadableTime = (timeStr: string, minutesOffset: number) => {
-    if (!timeStr) return "--:--";
-    const [h, m] = timeStr.split(":").map(Number);
-    let total = h * 60 + m + minutesOffset;
-    if (total < 0) total += 24 * 60;
-    total = total % (24 * 60);
-    const finalH = Math.floor(total / 60);
-    const finalM = total % 60;
-    const finalMPadded = String(finalM).padStart(2, "0");
-
-    const ampm = finalH >= 12 ? "PM" : "AM";
-    const formattedHour = finalH % 12 || 12;
-    return `${formattedHour}:${finalMPadded} ${ampm}`;
   };
 
   if (loading) {
@@ -257,48 +141,8 @@ export default function EmployeeAttendancePage() {
     );
   }
 
-  const isButtonsDisabled = isSunday || !isWithinWindow || actionLoading;
-
   return (
     <div className="space-y-6 pb-12">
-      {/* Confirmation Dialog */}
-      {confirmModal.isOpen && (
-        <div className="fixed inset-0 bg-content-main/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-surface-card border border-line-subtle rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-xl">
-            <div className="flex items-center gap-2.5 text-amber-600">
-              <AlertTriangle className="w-5 h-5 shrink-0" />
-              <h3 className="text-sm font-bold text-content-main">Confirm Action</h3>
-            </div>
-            <p className="text-xs text-content-secondary leading-relaxed">
-              Are you sure you want to register your <span className="font-bold text-content-main">{confirmModal.action === "check-in" ? "Check-In" : "Check-Out"}</span> session? Please verify before continuing.
-            </p>
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                onClick={() => setConfirmModal({ isOpen: false, action: null })}
-                className="px-4 py-2 border border-line-subtle rounded-xl text-xs font-semibold text-content-secondary hover:bg-surface-main transition cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  if (confirmModal.action) {
-                    handleAction(confirmModal.action);
-                  }
-                  setConfirmModal({ isOpen: false, action: null });
-                }}
-                className={`px-4 py-2 text-white rounded-xl text-xs font-semibold transition cursor-pointer ${
-                  confirmModal.action === "check-in" 
-                    ? "bg-brand-accent hover:bg-brand-hover" 
-                    : "bg-rose-600 hover:bg-rose-700"
-                }`}
-              >
-                Confirm
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Header */}
       <div className="pb-6 border-b border-line-subtle flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -306,7 +150,7 @@ export default function EmployeeAttendancePage() {
             Shift Attendance
           </h1>
           <p className="mt-1 text-xs text-content-secondary leading-relaxed">
-            Process daily session check-in and check-out logs and track active session stats.
+            Your punches are recorded on the office fingerprint device. This page shows those times.
           </p>
         </div>
 
@@ -316,106 +160,48 @@ export default function EmployeeAttendancePage() {
         </div>
       </div>
 
-      {/* Alerts */}
-      {isSunday && (
-        <div className="flex items-center gap-2.5 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold">
-          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-          <span>Today is Sunday (Weekly Off). Shift actions are currently disabled.</span>
-        </div>
-      )}
-
-      {!isSunday && !isWithinWindow && (
-        <div className="flex items-center gap-2.5 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold">
-          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-          <span>Outside Shift Margin: Attendance actions are restricted between {getReadableTime(settings.shiftStart, -(settings.checkInDisplayBefore || 0))} and {getReadableTime(settings.shiftEnd, (settings.checkOutDisplayAfter || 0))}.</span>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 rounded-xl bg-brand-subtle/50 border border-brand-subtle text-xs text-content-main leading-relaxed">
-        <div className="flex gap-2">
-          <AlertCircle className="w-4 h-4 text-brand-accent shrink-0 mt-0.5" />
-          <div>
-            <strong className="font-semibold block text-content-main">Check-In Grace Period:</strong>
-            Shift starts active check-ins at {getReadableTime(settings.shiftStart, -(settings.checkInDisplayBefore || 0))}. Arrivals after {getReadableTime(settings.shiftStart, (settings.gracePeriod || 15))} will flag your session status as <span className="text-amber-700 font-bold">Late</span>.
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-          <div>
-            <strong className="font-semibold block text-content-main">Operational Limits:</strong>
-            Working hours count up to 8 hours max per day. Absent statuses will not count toward working hours.
-          </div>
-        </div>
-        <div className="flex gap-2 rounded-lg bg-amber-50 border border-amber-200 p-3 -my-1 text-amber-900">
-          <Timer className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-          <div>
-            <strong className="font-semibold block text-amber-900">Break Policy:</strong>
-            The scheduled break time is from <span className="font-bold">2:00 PM to 3:00 PM</span>.
-          </div>
-        </div>
+      <div className="flex items-start gap-3 rounded-xl border border-brand-subtle bg-brand-subtle/50 p-4 text-xs text-content-main">
+        <Fingerprint className="mt-0.5 h-4 w-4 shrink-0 text-brand-accent" />
+        <p>
+          Check-in and check-out happen on the fingerprint device. Arrivals after the {settings.gracePeriod || 15} minute grace period are marked Late.
+        </p>
       </div>
 
-      {errorMessage && (
-        <div className="flex items-center gap-2.5 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold">
-          <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
-          <span>{errorMessage}</span>
-        </div>
-      )}
-
-      {/* Action Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-        {/* Check-In */}
         <div className="p-5 sm:p-6 rounded-2xl border border-line-subtle bg-surface-card shadow-xs flex flex-col justify-between gap-6">
           <div className="space-y-1">
-            <span className="text-[10px] font-extrabold uppercase tracking-widest text-content-muted">Daily Entrance Check-In</span>
-            <h2 className="text-base sm:text-lg font-extrabold text-content-main">Start Work Session</h2>
+            <span className="text-[10px] font-extrabold uppercase tracking-widest text-content-muted">Today&apos;s Check-In</span>
+            <h2 className="text-base sm:text-lg font-extrabold text-content-main">Recorded Entrance</h2>
           </div>
           <div className="flex items-center gap-3">
             <div className="p-3 rounded-xl bg-brand-subtle text-brand-accent">
-              <LogIn className="w-5 h-5" />
+              <Clock className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-[10px] text-content-muted block font-medium">Recorded Check-In</span>
+              <span className="text-[10px] text-content-muted block font-medium">Device punch</span>
               <span className="text-sm font-bold text-content-main">
-                {todayRecord ? formatTimeStr(todayRecord.checkIn) : "Not Tracked"}
+                {todayRecord?.checkIn ? formatTimeStr(todayRecord.checkIn) : "Not recorded"}
               </span>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setConfirmModal({ isOpen: true, action: "check-in" })}
-            disabled={!!todayRecord || isButtonsDisabled}
-            className="w-full bg-brand-accent hover:bg-brand-hover text-white py-2.5 rounded-xl text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed inline-flex justify-center items-center gap-2 transition cursor-pointer shadow-xs"
-          >
-            {actionLoading ? "Executing..." : todayRecord ? "Checked In Successfully" : "Register Check-In"}
-          </button>
         </div>
 
-        {/* Check-Out */}
         <div className="p-5 sm:p-6 rounded-2xl border border-line-subtle bg-surface-card shadow-xs flex flex-col justify-between gap-6">
           <div className="space-y-1">
-            <span className="text-[10px] font-extrabold uppercase tracking-widest text-content-muted">Daily Departure Check-Out</span>
-            <h2 className="text-base sm:text-lg font-extrabold text-content-main">End Work Session</h2>
+            <span className="text-[10px] font-extrabold uppercase tracking-widest text-content-muted">Today&apos;s Check-Out</span>
+            <h2 className="text-base sm:text-lg font-extrabold text-content-main">Recorded Exit</h2>
           </div>
           <div className="flex items-center gap-3">
             <div className="p-3 rounded-xl bg-rose-50 text-rose-600 border border-rose-100">
-              <LogOut className="w-5 h-5" />
+              <Clock className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-[10px] text-content-muted block font-medium">Recorded Check-Out</span>
+              <span className="text-[10px] text-content-muted block font-medium">Device punch</span>
               <span className="text-sm font-bold text-content-main">
-                {todayRecord?.checkOut ? formatTimeStr(todayRecord.checkOut) : "Not Tracked"}
+                {todayRecord?.checkOut ? formatTimeStr(todayRecord.checkOut) : "Not recorded"}
               </span>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setConfirmModal({ isOpen: true, action: "check-out" })}
-            disabled={!todayRecord || !!todayRecord?.checkOut || isButtonsDisabled}
-            className="w-full bg-rose-600 hover:bg-rose-700 text-white py-2.5 rounded-xl text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed inline-flex justify-center items-center gap-2 transition cursor-pointer shadow-xs"
-          >
-            {actionLoading ? "Executing..." : todayRecord?.checkOut ? "Checked Out Successfully" : "Register Check-Out"}
-          </button>
         </div>
 
         {/* Diagnostics */}
@@ -482,7 +268,7 @@ export default function EmployeeAttendancePage() {
                 {history.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-6 py-12 text-center text-content-muted">
-                      No historical logs recorded. Register a check-in action to create one.
+                      No punches recorded yet. They will appear after the fingerprint device is connected.
                     </td>
                   </tr>
                 ) : (

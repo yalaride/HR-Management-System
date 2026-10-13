@@ -436,9 +436,9 @@ export default function AdminEmployeesPage() {
       )}
 
       {/* 2. HEADER AREA & TOOLBAR */}
-      <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 pb-6 border-b border-line-subtle">
-        <div>
-          <div className="flex items-center gap-2.5">
+      <div className="flex flex-col gap-4 border-b border-line-subtle pb-6">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2.5">
             <h1 className="text-2xl font-extrabold text-content-main tracking-tight font-sans">
               Employees
             </h1>
@@ -461,8 +461,8 @@ export default function AdminEmployeesPage() {
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2.5">
-          <div className="relative w-full sm:w-52">
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="relative w-full sm:col-span-2 lg:col-span-1">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <svg
                 className="h-4 w-4 text-content-muted"
@@ -493,7 +493,7 @@ export default function AdminEmployeesPage() {
             options={departmentOptions}
             value={departmentFilter}
             onChange={setDepartmentFilter}
-            className="w-full sm:w-44"
+            className="w-full"
           />
 
           <FilterSelect
@@ -502,7 +502,7 @@ export default function AdminEmployeesPage() {
             options={EMPLOYMENT_TYPE_OPTIONS}
             value={employmentTypeFilter}
             onChange={setEmploymentTypeFilter}
-            className="w-full sm:w-40"
+            className="w-full"
           />
 
           {hasActiveFilters && (
@@ -515,7 +515,7 @@ export default function AdminEmployeesPage() {
                 setOnlyDueReviews(false);
               }}
               title="Clear all filters"
-              className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-bold text-content-secondary hover:text-content-main bg-surface-card border border-line-subtle rounded-xl shadow-sm transition cursor-pointer whitespace-nowrap"
+              className="flex w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-line-subtle bg-surface-card px-3 py-2 text-xs font-bold text-content-secondary shadow-sm transition hover:text-content-main cursor-pointer sm:col-span-2 sm:w-auto sm:justify-self-start lg:col-span-3"
             >
               <X className="w-3.5 h-3.5" />
               <span>Clear</span>
@@ -527,8 +527,8 @@ export default function AdminEmployeesPage() {
 
       {/* 3. DIRECTORY TABLE SECTION */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="text-[10px] font-extrabold uppercase tracking-widest text-content-muted">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 text-[10px] font-extrabold uppercase tracking-widest text-content-muted">
             Directory List ({filteredEmployees.length})
             {onlyDueReviews && (
               <span className="ml-2 font-bold text-amber-600 lowercase">
@@ -541,7 +541,7 @@ export default function AdminEmployeesPage() {
               setAddEmployeeError(null);
               setIsAddModalOpen(true);
             }}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-brand-accent hover:bg-brand-hover text-white text-xs font-bold rounded-xl shadow-sm transition-all duration-150 active:scale-[0.98] cursor-pointer whitespace-nowrap"
+            className="inline-flex w-full shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-brand-accent px-4 py-2 text-xs font-bold text-white shadow-sm transition-all duration-150 hover:bg-brand-hover active:scale-[0.98] cursor-pointer sm:w-auto"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path

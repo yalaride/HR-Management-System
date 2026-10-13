@@ -101,15 +101,15 @@ export function StatCard({
   };
 
   return (
-    <div className="group p-6 rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 flex flex-col justify-between gap-5">
-      <div className="flex items-start justify-between">
+    <div className="group flex h-full flex-col justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md sm:p-5">
+      <div className="flex items-center justify-between gap-2">
         {/* Statistics Icon Wrapper */}
-        <div className={`p-3 rounded-xl border flex items-center justify-center transition-colors ${colorClass}`}>
+        <div className={`flex shrink-0 items-center justify-center rounded-xl border p-2.5 transition-colors ${colorClass}`}>
           <IconComponent className="w-5 h-5" />
         </div>
         
         {/* Metric Delta Badge - Shows arrow only if it represents a trend direction */}
-        <span className={`inline-flex items-center gap-0.5 px-2.5 py-1 rounded-full text-[11px] font-semibold tracking-wide border ${badgeColorClass}`}>
+        <span className={`inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap rounded-full px-2 py-1 text-[11px] font-semibold tracking-wide border ${badgeColorClass}`}>
           {hasTrend && (
             isPositive ? (
               <ArrowUpRight className="w-3 h-3 text-emerald-600 stroke-[2.5]" />
@@ -132,9 +132,9 @@ export function StatCard({
       </div>
 
       {/* Status Context Helper Text */}
-      <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-        <span>{changeText}</span>
-        <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-1 transition-transform" />
+      <div className="flex items-center justify-between gap-2 border-t border-slate-100 pt-4 text-xs text-slate-500">
+        <span className="min-w-0 truncate">{changeText}</span>
+        <ChevronRight className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-1" />
       </div>
     </div>
   );

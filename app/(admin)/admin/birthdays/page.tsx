@@ -106,9 +106,9 @@ export default function BirthdayDashboard() {
       <div className=" space-y-6">
         
         {/* Page Title */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-6 border-b border-line-subtle">
-          <div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-content-main flex items-center gap-2.5">
+        <div className="flex flex-col gap-4 border-b border-line-subtle pb-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <h1 className="flex items-center gap-2.5 text-xl font-extrabold tracking-tight text-content-main sm:text-2xl">
               Employee Birthdays
               <span className="flex h-2.5 w-2.5 relative">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-accent opacity-75"></span>
@@ -120,12 +120,12 @@ export default function BirthdayDashboard() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex w-full shrink-0 sm:w-auto">
             <button
               onClick={() => {
                 refreshBirthdays();
               }}
-              className="btn-outline px-4 py-2 text-xs font-bold w-auto inline-flex items-center gap-2 cursor-pointer"
+              className="btn-outline inline-flex w-full cursor-pointer items-center justify-center gap-2 whitespace-nowrap px-4 py-2 text-xs font-bold sm:w-auto"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-brand-accent" : ""}`} /> 
               Refresh Records
@@ -153,8 +153,8 @@ export default function BirthdayDashboard() {
         </div>
 
         {/* Filter Controls Panel */}
-        <div className="bg-surface-card border border-line-subtle rounded-2xl p-4 md:p-5 shadow-xs flex flex-col lg:flex-row gap-5 items-center justify-between w-full">
-          <div className="relative w-full lg:flex-1 lg:max-w-md">
+        <div className="flex w-full flex-col gap-3 rounded-2xl border border-line-subtle bg-surface-card p-4 shadow-xs sm:flex-row sm:flex-wrap sm:items-center sm:p-5">
+          <div className="relative w-full min-w-[14rem] flex-1">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-content-muted pointer-events-none select-none" />
             <input
               type="text"
@@ -165,7 +165,7 @@ export default function BirthdayDashboard() {
             />
           </div>
 
-          <div className="flex flex-col sm:flex-row sm:items-center gap-5 w-full lg:w-auto lg:justify-end">
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
             <div className="w-full sm:w-auto">
               <CustomDropdown
                 label="Department:"

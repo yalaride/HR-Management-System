@@ -192,7 +192,8 @@ export async function POST(request: Request) {
       allowances,
       bonus,
       deductions,
-      netPay,
+      tax,
+      taxMode,
       paymentMethod,
       paymentDate,
     } = body;
@@ -201,14 +202,29 @@ export async function POST(request: Request) {
     const parsedAllowances = Number(allowances || 0);
     const parsedBonus = Number(bonus || 0);
     const parsedDeductions = Number(deductions || 0);
-    const parsedNetPay = Number(
-      netPay ?? parsedBasicSalary + parsedAllowances + parsedBonus - parsedDeductions
-    );
+    const parsedTax = Math.max(0, Number(tax || 0));
+    const parsedTaxMode = taxMode === "add" ? "add" : "deduct";
+    const taxEffect = parsedTaxMode === "add" ? parsedTax : -parsedTax;
+    const parsedNetPay =
+      parsedBasicSalary + parsedAllowances + parsedBonus - parsedDeductions + taxEffect;
     const parsedPaymentDate = paymentDate ? new Date(paymentDate) : undefined;
 
     if (!employeeId || !period || Number.isNaN(parsedBasicSalary) || parsedBasicSalary <= 0) {
       return NextResponse.json(
         { error: "Missing required fields or invalid salary value" },
+        { status: 400 }
+      );
+    }
+    if (
+      [parsedAllowances, parsedBonus, parsedDeductions, parsedTax, parsedNetPay].some((value) =>
+        Number.isNaN(value)
+      )
+    ) {
+      return NextResponse.json({ error: "Salary figures must be valid numbers." }, { status: 400 });
+    }
+    if (parsedNetPay < 0) {
+      return NextResponse.json(
+        { error: "Tax and deductions cannot be more than the total earnings." },
         { status: 400 }
       );
     }
@@ -232,6 +248,8 @@ export async function POST(request: Request) {
       allowances: parsedAllowances,
       bonus: parsedBonus,
       deductions: parsedDeductions,
+      tax: parsedTax,
+      taxMode: parsedTaxMode,
       netPay: parsedNetPay,
       paymentMethod,
       paymentDate: parsedPaymentDate,

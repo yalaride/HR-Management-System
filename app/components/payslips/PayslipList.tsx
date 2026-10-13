@@ -128,7 +128,8 @@ export default function PayslipList({
 
   let totalColumns = 5; 
   if (showEmployeeColumn) totalColumns += 1;
-  if (showDetailedBreakdown) totalColumns += 3; 
+  if (showDetailedBreakdown) totalColumns += 3;
+  totalColumns += 1; 
   if (showVersion) totalColumns += 1;
   if (showPaymentDate) totalColumns += 1;
   if (showReference) totalColumns += 1;
@@ -163,6 +164,7 @@ export default function PayslipList({
                   <th className="px-6 py-4 text-right text-rose-600">Deductions</th>
                 </>
               )}
+              <th className="px-6 py-4 text-right text-rose-600">Tax</th>
               
               <th className="px-6 py-4 text-right">Net Take-Home</th>
               {showPaymentDate && (
@@ -282,6 +284,20 @@ export default function PayslipList({
                         </td>
                       </>
                     )}
+
+                    <td className="px-6 py-4 text-right font-semibold">
+                      {(slip.tax || 0) <= 0 ? (
+                        <span className="text-content-muted">—</span>
+                      ) : slip.taxMode === "add" ? (
+                        <span className="text-emerald-600">
+                          +{formatCurrency ? formatCurrency(slip.tax || 0) : slip.tax}
+                        </span>
+                      ) : (
+                        <span className="text-rose-600">
+                          -{formatCurrency ? formatCurrency(slip.tax || 0) : slip.tax}
+                        </span>
+                      )}
+                    </td>
 
                     <td className="px-6 py-4 text-right font-extrabold text-content-main">
                       <span className="text-brand-accent">

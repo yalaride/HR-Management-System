@@ -351,6 +351,12 @@ export default function Sidebar({ role }: SidebarProps) {
     icon: <Activity className="w-5 h-5 shrink-0" />,
   };
 
+  const attendanceDeskNavItem = {
+    href: "/employee/attendance-records",
+    label: "Set Attendance",
+    icon: <CalendarClock className="w-5 h-5 shrink-0" />,
+  };
+
   let activeNavItems = [...navItems[displayRole]];
   if (displayRole === "employee" && isDepartmentHead) {
     activeNavItems = [...activeNavItems, ...departmentHeadNavItems];
@@ -360,11 +366,12 @@ export default function Sidebar({ role }: SidebarProps) {
     if (profileIdx >= 0) {
       activeNavItems = [
         ...activeNavItems.slice(0, profileIdx),
+        attendanceDeskNavItem,
         auditLogNavItem,
         ...activeNavItems.slice(profileIdx),
       ];
     } else {
-      activeNavItems = [...activeNavItems, auditLogNavItem];
+      activeNavItems = [...activeNavItems, attendanceDeskNavItem, auditLogNavItem];
     }
   }
 

@@ -8,6 +8,7 @@ import { sendWelcomeEmail } from "@/lib/email/welcome-email";
 import { getAdminUser } from "@/lib/auth";
 import { syncDueReviews } from "@/lib/cron/sync-reviews";
 import { applyEmployeeLeaveProration } from "@/lib/leave-proration";
+import { effectiveEmploymentPeriod } from "@/lib/employment-period";
 
 interface EmployeeExtension {
   type?: string;
@@ -67,6 +68,15 @@ export async function GET() {
     const formattedEmployees = employees.map((emp) => {
       const targetEndDate =
         emp.periodEndDate || emp.probationEndDate || emp.internshipEndDate || null;
+      const period = effectiveEmploymentPeriod({
+        employmentType: emp.employmentType,
+        reviewStatus: emp.reviewStatus,
+        joinDate: emp.joinDate,
+        lifecycleDurationMonths: emp.lifecycleDurationMonths,
+        periodEndDate: emp.periodEndDate,
+        probationEndDate: emp.probationEndDate,
+        internshipEndDate: emp.internshipEndDate,
+      });
 
       return {
         id: emp._id.toString(),
@@ -81,7 +91,7 @@ export async function GET() {
           emp.hourlyRate !== undefined && emp.hourlyRate !== null ? Number(emp.hourlyRate) : 0,
         profilePhotoUrl: emp.profilePhotoUrl || emp.profilePhotoURL || "",
         employmentType: emp.employmentType || "Probation",
-        reviewStatus: emp.reviewStatus || "Pending",
+        reviewStatus: period.reviewStatus,
         periodEndDate: targetEndDate ? new Date(targetEndDate).toISOString() : null,
         periodStartDate: emp.periodStartDate ? new Date(emp.periodStartDate).toISOString() : null,
         lifecycleDurationMonths: emp.lifecycleDurationMonths ?? null,

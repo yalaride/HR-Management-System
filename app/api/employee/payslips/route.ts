@@ -32,7 +32,7 @@ export async function GET() {
     // Explicitly select `version` because the UI relies on it for the Version column.
     const payslips = await Payslip.find({ employeeId, status: "Active" })
       .select(
-        "_id employeeId period basicSalary allowances bonus deductions netPay paymentMethod paymentDate status version"
+        "_id employeeId period basicSalary allowances bonus deductions tax taxMode netPay paymentMethod paymentDate status version"
       )
       .populate("employeeId", "name jobTitle")
       .sort({ createdAt: -1 })

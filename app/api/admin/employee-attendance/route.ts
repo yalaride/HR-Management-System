@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getAdminUser } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
+import { canManuallyEditAttendance } from "@/lib/audit-log-access";
 import {
   getDayAttendanceSheet,
   getUserAttendanceHistory,
@@ -10,9 +11,9 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
-    const admin = await getAdminUser();
-    if (!admin) {
-      return NextResponse.json({ error: "Forbidden: Admin access required." }, { status: 403 });
+    const user = await getSessionUser();
+    if (!canManuallyEditAttendance(user)) {
+      return NextResponse.json({ error: "Forbidden: You cannot view attendance records." }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);
@@ -39,9 +40,9 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const admin = await getAdminUser();
-    if (!admin) {
-      return NextResponse.json({ error: "Forbidden: Admin access required." }, { status: 403 });
+    const user = await getSessionUser();
+    if (!canManuallyEditAttendance(user)) {
+      return NextResponse.json({ error: "Forbidden: You cannot set check-in or check-out." }, { status: 403 });
     }
 
     const body = await request.json();

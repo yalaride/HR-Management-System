@@ -161,7 +161,8 @@ export default function ManageLeavePolicyModal({
       <div className="absolute inset-0 bg-content-main/40 backdrop-blur-xs transition-opacity" onClick={onClose} />
 
       {/* Modal Container */}
-      <div className="relative w-full max-w-md bg-surface-card border border-line-subtle rounded-2xl shadow-2xl p-6 flex flex-col overflow-visible z-10 animate-in fade-in zoom-in-95 duration-150">
+      <div className="relative w-full max-w-md max-h-[min(90vh,40rem)] bg-surface-card border border-line-subtle rounded-2xl shadow-2xl flex flex-col overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-150">
+        <div className="p-6 overflow-y-auto">
         {/* Close Button */}
         <button
           onClick={onClose}
@@ -233,10 +234,9 @@ export default function ManageLeavePolicyModal({
           </button>
 
           {isDropdownOpen && (
-            <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-[#e2e0e8] rounded-xl shadow-xl max-h-48 overflow-y-auto z-[60] p-2 space-y-1.5">
-              {/* Search Inside Dropdown */}
-              <div className="relative sticky top-0 bg-white pb-1.5">
-                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400">
+            <div className="mt-1.5 border border-line-subtle rounded-xl bg-surface-card overflow-hidden">
+              <div className="relative border-b border-line-subtle p-2">
+                <span className="absolute left-4.5 top-1/2 -translate-y-1/2 text-content-muted pointer-events-none">
                   <Search className="w-3.5 h-3.5" />
                 </span>
                 <input
@@ -244,13 +244,13 @@ export default function ManageLeavePolicyModal({
                   placeholder="Type to search..."
                   value={dropdownSearch}
                   onChange={(e) => setDropdownSearch(e.target.value)}
-                  className="w-full pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:ring-1 focus:ring-indigo-500 text-gray-700 font-medium"
+                  className="w-full pl-8 pr-3 py-1.5 bg-surface-main border border-line-subtle rounded-lg text-xs text-content-main outline-none focus:ring-2 focus:ring-brand-accent/20 focus:border-brand-accent"
                 />
               </div>
 
-              <div className="divide-y divide-gray-100">
+              <div className="max-h-44 overflow-y-auto">
                 {filteredEmployees.length === 0 ? (
-                  <div className="text-center py-4 text-[10px] text-gray-400 font-semibold">
+                  <div className="text-center py-4 text-[10px] text-content-muted font-semibold">
                     No matching employees found
                   </div>
                 ) : (
@@ -259,16 +259,15 @@ export default function ManageLeavePolicyModal({
                       key={emp.userId}
                       type="button"
                       onClick={() => handleSelectEmployee(emp)}
-                      className={`w-full text-left p-2 rounded-lg hover:bg-gray-50 transition font-medium block ${
-                        selectedEmp?.userId === emp.userId ? "bg-indigo-50/70" : ""
+                      className={`w-full text-left px-3 py-2 border-b border-line-subtle last:border-b-0 hover:bg-brand-subtle transition block ${
+                        selectedEmp?.userId === emp.userId ? "bg-brand-subtle" : ""
                       }`}
                     >
-                      <span className="block font-bold text-xs text-gray-800">{emp.name}</span>
-                      <span className="block text-[10px] text-gray-400">{emp.email}</span>
+                      <span className="block font-bold text-xs text-content-main">{emp.name}</span>
+                      <span className="block text-[10px] text-content-muted">{emp.email}</span>
                       {emp.designation && (
-                        <span className="block text-[10px] text-gray-500">{emp.designation}</span>
+                        <span className="block text-[10px] text-content-secondary">{emp.designation}</span>
                       )}
-
                     </button>
                   ))
                 )}
@@ -343,6 +342,7 @@ export default function ManageLeavePolicyModal({
             Please choose an active employee above to configure settings.
           </div>
         )}
+        </div>
       </div>
     </div>
   );

@@ -215,29 +215,29 @@ export default function AdminLeavesPolicyPage() {
   return (
     <div className="space-y-6 max-w-375 mx-auto min-h-screen pb-12">
       {/* Header Info */}
-      <div className="pb-6 border-b border-line-subtle flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-extrabold text-content-main tracking-tight font-sans">
+      <div className="flex flex-col gap-4 border-b border-line-subtle pb-6 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl font-extrabold text-content-main tracking-tight font-sans sm:text-2xl">
             Manage Leaves Policy
           </h1>
-          <p className="text-xs text-content-muted mt-1 font-medium">
+          <p className="mt-1 text-xs font-medium text-content-muted">
             Set global standard leave allocations for all staff and configure individual overrides.
           </p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
           <button
             onClick={() => {
               setGlobalForm(globalPolicy);
               setIsGlobalModalOpen(true);
             }}
-            className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-brand-accent hover:bg-brand-hover transition cursor-pointer shadow-sm"
+            className="inline-flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-brand-accent px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-brand-hover cursor-pointer sm:w-auto"
           >
-            <Settings2 className="w-4 h-4" />
+            <Settings2 className="h-4 w-4 shrink-0" />
             Edit Global Policy
           </button>
           <button
             onClick={handleOpenCreateModal}
-            className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-brand-accent hover:bg-brand-hover transition cursor-pointer shadow-sm"
+            className="inline-flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-brand-accent px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-brand-hover cursor-pointer sm:w-auto"
           >
             Create Policy Override
           </button>
@@ -269,14 +269,14 @@ export default function AdminLeavesPolicyPage() {
 
       {/* GLOBAL DEFAULT POLICY PANEL */}
       <div className="bg-surface-card border border-line-subtle rounded-2xl p-5 shadow-sm">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-line-subtle">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-brand-accent text-white flex items-center justify-center shadow-sm">
-              <Globe className="w-5 h-5" />
+        <div className="flex flex-col gap-4 border-b border-line-subtle pb-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-start gap-3 sm:items-center">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-accent text-white shadow-sm">
+              <Globe className="h-5 w-5" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-sm font-extrabold text-content-main uppercase tracking-wider">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-sm font-extrabold uppercase tracking-wider text-content-main">
                   Company-Wide Standard Leave Policy
                 </h2>
                 <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-brand-subtle text-brand-accent">
@@ -292,7 +292,7 @@ export default function AdminLeavesPolicyPage() {
         </div>
 
         {/* Global Policy Numbers Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4">
+        <div className="grid grid-cols-1 gap-3 pt-4 min-[480px]:grid-cols-2 xl:grid-cols-4">
           <div className="p-3 bg-white rounded-xl border border-line-subtle shadow-2xs">
             <span className="text-[10px] font-bold text-content-muted uppercase">Annual Leave</span>
             <div className="text-lg font-mono font-extrabold text-brand-accent mt-1">
@@ -314,7 +314,7 @@ export default function AdminLeavesPolicyPage() {
             </div>
           </div>
 
-          <div className="p-3 bg-brand-accent text-white rounded-xl shadow-2xs col-span-2 sm:col-span-1">
+          <div className="rounded-xl bg-brand-accent p-3 text-white shadow-2xs min-[480px]:col-span-2 xl:col-span-1">
             <span className="text-[10px] font-bold text-white/80 uppercase">Total Annual Pool</span>
             <div className="text-lg font-mono font-extrabold mt-1">
               {globalTotalPool} <span className="text-xs font-sans text-white/80 font-medium">days</span>
@@ -325,7 +325,7 @@ export default function AdminLeavesPolicyPage() {
 
       {/* Stats Summary Grid */}
       {!initialLoading && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <div className="panel panel-section flex items-center justify-between">
             <div>
               <p className="field-label">Total Staff Monitored</p>

@@ -1,8 +1,7 @@
 /**
- * Shared attendance operations used by both the admin panel
- * (/api/admin/employee-attendance) and department heads (/api/head/attendance).
- * All business rules (grace period, night shifts, monthly locks, auto
- * check-out) live here so the two routes can never drift apart.
+ * Shared attendance operations used by the admin panel and the attendance editor
+ * (/api/admin/employee-attendance). Department heads can view their team, but
+ * only an admin or the attendance editor can set check-in and check-out.
  */
 import dbConnect from "@/lib/mongodb";
 import { Attendance } from "@/modals/Attendance";

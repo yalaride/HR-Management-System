@@ -7,6 +7,10 @@ import { DepartmentHead } from "@/modals/DepartmentHead";
 import { getAdminUser } from "@/lib/auth";
 import { isValidObjectId } from "mongoose";
 import { applyEmployeeLeaveProration } from "@/lib/leave-proration";
+import {
+  effectiveEmploymentPeriod,
+  isEmploymentPeriodDue,
+} from "@/lib/employment-period";
 
 export async function PUT(
   request: Request,
@@ -96,7 +100,8 @@ export async function PUT(
         : employee.designation || employee.jobTitle || "";
 
     let joinDateUpdated = false;
-    let parsedJoinDate = employee.joinDate ? new Date(employee.joinDate) : new Date();
+    const originalJoinDate = employee.joinDate ? new Date(employee.joinDate) : null;
+    let parsedJoinDate = originalJoinDate ? new Date(originalJoinDate) : new Date();
 
     if (joinDate !== undefined) {
       parsedJoinDate = new Date(joinDate);
@@ -238,13 +243,34 @@ export async function PUT(
     // -------------------------------------------------------------------------
     // 5. REVIEW ACTIONS: EXTEND / CONFIRM
     // -------------------------------------------------------------------------
+    const originalJoinKey = originalJoinDate ? originalJoinDate.toISOString().slice(0, 10) : "";
+    const nextJoinKey = parsedJoinDate.toISOString().slice(0, 10);
+    const joinActuallyChanged = originalJoinKey !== nextJoinKey;
+    const durationActuallyChanged =
+      requestedDuration !== undefined &&
+      employee.lifecycleDurationMonths != null &&
+      Number(requestedDuration) !== Number(employee.lifecycleDurationMonths);
+    const scheduleChanged = joinActuallyChanged || durationActuallyChanged;
+    const periodIsDue = isEmploymentPeriodDue(
+      {
+        employmentType: employee.employmentType,
+        reviewStatus: scheduleChanged ? "Pending" : employee.reviewStatus,
+        joinDate: parsedJoinDate,
+        lifecycleDurationMonths: requestedDuration ?? employee.lifecycleDurationMonths ?? null,
+        periodEndDate: scheduleChanged ? null : employee.periodEndDate,
+        probationEndDate: scheduleChanged ? null : employee.probationEndDate,
+        internshipEndDate: scheduleChanged ? null : employee.internshipEndDate,
+      },
+      now
+    );
+
     if (reviewAction === "EXTEND") {
       const duration = Number(extendMonths);
       if (
         !Number.isInteger(duration) ||
         ![1, 2, 3].includes(duration) ||
         !["Probation", "Internship"].includes(employee.employmentType) ||
-        employee.reviewStatus !== "Due Review"
+        !periodIsDue
       ) {
         return NextResponse.json(
           { error: "Only a due probation or internship can be extended by 1, 2, or 3 months." },
@@ -260,8 +286,19 @@ export async function PUT(
         );
       }
 
-      const rawCurrentEnd =
-        employee.periodEndDate || employee.probationEndDate || employee.internshipEndDate;
+      const resolvedPeriod = effectiveEmploymentPeriod(
+        {
+          employmentType: employee.employmentType,
+          reviewStatus: employee.reviewStatus,
+          joinDate: parsedJoinDate,
+          lifecycleDurationMonths: requestedDuration ?? employee.lifecycleDurationMonths ?? null,
+          periodEndDate: employee.periodEndDate,
+          probationEndDate: employee.probationEndDate,
+          internshipEndDate: employee.internshipEndDate,
+        },
+        now
+      );
+      const rawCurrentEnd = resolvedPeriod.periodEndDate;
       const baseEndDate = rawCurrentEnd ? new Date(rawCurrentEnd) : new Date(parsedJoinDate);
 
       // If the base date was historically far back, base from today; otherwise add to base end date
@@ -305,14 +342,35 @@ export async function PUT(
       employee.markModified("periodEndDate");
       employee.markModified("nextReviewDate");
     } else if (reviewAction === "CONFIRM") {
-      if (
-        !["Probation", "Internship"].includes(employee.employmentType) ||
-        employee.reviewStatus !== "Due Review"
-      ) {
+      if (!["Probation", "Internship"].includes(employee.employmentType) || !periodIsDue) {
         return NextResponse.json(
           { error: "Only a due probation or internship can be confirmed as permanent." },
           { status: 400 }
         );
+      }
+
+      const resolvedPeriod = effectiveEmploymentPeriod(
+        {
+          employmentType: employee.employmentType,
+          reviewStatus: employee.reviewStatus,
+          joinDate: parsedJoinDate,
+          lifecycleDurationMonths: requestedDuration ?? employee.lifecycleDurationMonths ?? null,
+          periodEndDate: employee.periodEndDate,
+          probationEndDate: employee.probationEndDate,
+          internshipEndDate: employee.internshipEndDate,
+        },
+        now
+      );
+      if (!employee.periodEndDate && resolvedPeriod.periodEndDate) {
+        employee.periodEndDate = resolvedPeriod.periodEndDate;
+        employee.nextReviewDate = resolvedPeriod.periodEndDate;
+        employee.lifecycleDurationMonths = resolvedPeriod.durationMonths;
+        if (employee.employmentType === "Probation") {
+          employee.probationEndDate = resolvedPeriod.periodEndDate;
+        }
+        if (employee.employmentType === "Internship") {
+          employee.internshipEndDate = resolvedPeriod.periodEndDate;
+        }
       }
 
       employee.employmentType = "Permanent";

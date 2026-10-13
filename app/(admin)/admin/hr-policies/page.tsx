@@ -335,7 +335,7 @@ export default function AdminHRPoliciesPage() {
       )}
 
       {/* ── Metrics Cards ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <div className="flex items-center gap-3.5 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
           <div className="flex size-10 items-center justify-center rounded-xl bg-brand-subtle text-brand-accent">
             <Layers className="size-5" />
@@ -365,7 +365,7 @@ export default function AdminHRPoliciesPage() {
             <ShieldAlert className="size-5" />
           </div>
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 leading-snug">
               Mark as Read Required
             </div>
             <div className="text-xl font-extrabold text-indigo-600">{markAsReadCount}</div>
@@ -374,8 +374,8 @@ export default function AdminHRPoliciesPage() {
       </div>
 
       {/* ── Search & Filter Toolbar ── */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-2 flex-1">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
           <div className="relative min-w-[200px] max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-gray-400" />
             <input
@@ -413,7 +413,7 @@ export default function AdminHRPoliciesPage() {
           />
         </div>
 
-        <div className="flex items-center justify-between gap-3 sm:justify-end">
+        <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
           <span className="text-xs font-medium text-gray-500">
             Showing {filteredSections.length} of {totalSections} sections
           </span>

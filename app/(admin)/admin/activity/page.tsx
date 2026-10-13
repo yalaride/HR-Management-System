@@ -215,9 +215,9 @@ function ActivityLogPage() {
       </div>
 
       {/* Filter Controls Panel */}
-      <div className="bg-surface-card border border-line-subtle rounded-2xl p-4 shadow-xs flex flex-col lg:flex-row gap-4 items-center justify-between">
+      <div className="flex flex-col gap-3 rounded-2xl border border-line-subtle bg-surface-card p-4 shadow-xs sm:flex-row sm:flex-wrap sm:items-center">
         {/* Search Input */}
-        <div className="relative w-full lg:max-w-md">
+        <div className="relative w-full min-w-[14rem] flex-1">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-content-muted" />
           <input
             type="text"
@@ -229,7 +229,7 @@ function ActivityLogPage() {
         </div>
 
         {/* Dropdowns Group */}
-        <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
+        <div className="flex w-full flex-col items-stretch gap-3 sm:w-auto sm:flex-row sm:items-center">
           {/* Type Filter */}
           <div className="flex items-center gap-2 w-full sm:w-auto relative" ref={typeRef}>
             <span className="text-xs font-semibold text-content-secondary flex items-center gap-1.5 shrink-0">
