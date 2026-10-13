@@ -203,6 +203,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid date range." }, { status: 400 });
     }
 
+    // Compare calendar days rather than exact timestamps so same-day requests
+    // are blocked even when existing records contain a different time value.
+    const startDay = new Date(`${body.startDate}T00:00:00.000Z`);
+    const endDayExclusive = new Date(`${body.endDate}T00:00:00.000Z`);
+    endDayExclusive.setUTCDate(endDayExclusive.getUTCDate() + 1);
+
     const today = new Intl.DateTimeFormat("en-CA", {
       timeZone: "Asia/Karachi",
       year: "numeric",
@@ -231,8 +237,8 @@ export async function POST(request: Request) {
     const overlappingLeave = await Leave.findOne({
       userId,
       status: { $in: ["PENDING", "APPROVED"] },
-      startDate: { $lte: end },
-      endDate: { $gte: start },
+      startDate: { $lt: endDayExclusive },
+      endDate: { $gte: startDay },
     }).lean();
 
     if (overlappingLeave) {

@@ -280,7 +280,7 @@ export default function AdminHRPoliciesPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen space-y-6 pb-12 animate-pulse p-6">
+      <div className="min-h-screen space-y-6 pb-12 animate-pulse">
         <div className="h-8 w-64 bg-gray-200 rounded-lg" />
         <div className="h-28 bg-gray-200 rounded-2xl" />
         <div className="space-y-4">
@@ -292,7 +292,7 @@ export default function AdminHRPoliciesPage() {
   }
 
   return (
-    <div className="min-h-screen space-y-6 pb-16 p-4 sm:p-6">
+    <div className="min-h-screen space-y-6 pb-12">
       {/* ── Top Header ── */}
       <div className="flex flex-col gap-4 border-b border-gray-200 pb-5 sm:flex-row sm:items-center sm:justify-between">
         <div>

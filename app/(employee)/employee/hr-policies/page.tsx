@@ -154,7 +154,7 @@ export default function EmployeeHRPoliciesPage() {
   }
 
   return (
-    <div className="space-y-6 pb-16">
+    <div className="space-y-6 pb-12">
       {/* ── Page Header ── */}
       <header className="flex flex-col gap-4 pb-6 border-b border-line-subtle">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
