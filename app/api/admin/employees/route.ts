@@ -9,6 +9,7 @@ import { getAdminUser } from "@/lib/auth";
 import { syncDueReviews } from "@/lib/cron/sync-reviews";
 import { applyEmployeeLeaveProration } from "@/lib/leave-proration";
 import { effectiveEmploymentPeriod } from "@/lib/employment-period";
+import { normalizeDeviceUserNo } from "@/lib/device-user-no";
 
 interface EmployeeExtension {
   type?: string;
@@ -54,12 +55,13 @@ export async function GET() {
       internshipEndDate?: Date | null;
       confirmationDate?: Date | null;
       extensions?: EmployeeExtension[];
+      deviceUserNo?: string | null;
       userId?: { email?: string } | null;
     }
 
     const employees = (await Employee.find({ status: { $ne: "Inactive" } })
       .select(
-        "name department status designation joinDate salary hourlyRate profilePhotoUrl profilePhotoURL userId employmentType reviewStatus periodStartDate periodEndDate lifecycleDurationMonths nextReviewDate probationEndDate internshipEndDate confirmationDate extensions"
+        "name department status designation joinDate salary hourlyRate profilePhotoUrl profilePhotoURL userId employmentType reviewStatus periodStartDate periodEndDate lifecycleDurationMonths nextReviewDate probationEndDate internshipEndDate confirmationDate extensions deviceUserNo"
       )
       .populate("userId", "email")
       .sort({ createdAt: -1 })
@@ -100,6 +102,7 @@ export async function GET() {
           ? new Date(emp.confirmationDate).toISOString()
           : null,
         extensions: emp.extensions || [],
+        deviceUserNo: emp.deviceUserNo || "",
       };
     });
 
@@ -132,6 +135,7 @@ export async function POST(request: Request) {
       salary,
       employmentType = "Probation",
       durationMonths = 3,
+      deviceUserNo,
     } = body;
 
     const normalizedName = typeof name === "string" ? name.trim() : "";
@@ -167,6 +171,20 @@ export async function POST(request: Request) {
     const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser) {
       return NextResponse.json({ error: "A user with this email already exists" }, { status: 400 });
+    }
+
+    const parsedDeviceUserNo = normalizeDeviceUserNo(deviceUserNo);
+    if (!parsedDeviceUserNo.ok) {
+      return NextResponse.json({ error: parsedDeviceUserNo.error }, { status: 400 });
+    }
+    if (parsedDeviceUserNo.value) {
+      const taken = await Employee.findOne({ deviceUserNo: parsedDeviceUserNo.value }).select("_id");
+      if (taken) {
+        return NextResponse.json(
+          { error: "This fingerprint number is already assigned to another employee." },
+          { status: 400 }
+        );
+      }
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -290,6 +308,7 @@ export async function POST(request: Request) {
       internshipEndDate: employmentType === "Internship" ? periodEndDate : null,
       confirmationDate,
       extensions: [],
+      ...(parsedDeviceUserNo.value ? { deviceUserNo: parsedDeviceUserNo.value } : {}),
     });
 
     // Seed all leave balances from the joining month. Non-permanent employees
@@ -337,6 +356,7 @@ export async function POST(request: Request) {
       nextReviewDate: nextReviewDate ? nextReviewDate.toISOString() : null,
       lifecycleDurationMonths: newEmployee.lifecycleDurationMonths ?? null,
       confirmationDate: confirmationDate ? confirmationDate.toISOString() : null,
+      deviceUserNo: newEmployee.deviceUserNo || "",
     };
 
     return NextResponse.json(

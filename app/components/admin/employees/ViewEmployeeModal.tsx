@@ -229,6 +229,13 @@ export default function ViewEmployeeModal({
 
             <div>
               <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 block">
+                Fingerprint No.
+              </span>
+              <span className="font-semibold text-slate-700">{employee.deviceUserNo || "—"}</span>
+            </div>
+
+            <div>
+              <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 block">
                 System Status
               </span>
               <span

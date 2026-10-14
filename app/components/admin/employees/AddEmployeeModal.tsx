@@ -19,6 +19,7 @@ interface AddEmployeeModalProps {
     joinDate: string;
     employmentType: string;
     durationMonths: number;
+    deviceUserNo: string;
   }) => Promise<boolean | void> | boolean | void;
   departments?: string[];
 }
@@ -38,6 +39,7 @@ const getInitialFormData = () => ({
   password: "",
   department: "",
   designation: "",
+  deviceUserNo: "",
   salary: "" as string | number,
   joinDate: new Date().toISOString().split("T")[0],
   status: "Active",
@@ -201,6 +203,13 @@ export default function AddEmployeeModal({
       tempErrors.designation = "Designation is required";
     }
 
+    const fingerprint = formData.deviceUserNo.trim();
+    if (fingerprint && !/^\d{1,12}$/.test(fingerprint)) {
+      tempErrors.deviceUserNo = "Use the device number only, like 14, 15, or 16.";
+    } else if (fingerprint && fingerprint.replace(/^0+/, "") === "") {
+      tempErrors.deviceUserNo = "Fingerprint number must be greater than 0.";
+    }
+
     if (!formData.department) {
       tempErrors.department = "Department is required";
     }
@@ -250,6 +259,7 @@ export default function AddEmployeeModal({
         department: formData.department,
         status: formData.status,
         designation: formData.designation.trim(),
+        deviceUserNo: formData.deviceUserNo.trim(),
         salary: Number(formData.salary) || 0,
         joinDate: formData.joinDate,
         employmentType: formData.employmentType,
@@ -402,6 +412,26 @@ export default function AddEmployeeModal({
               />
               {errors.designation && (
                 <p className="text-[10px] text-rose-500 font-semibold">{errors.designation}</p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">
+                Fingerprint No.
+              </label>
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder="Same number as the device, e.g. 15"
+                value={formData.deviceUserNo}
+                onChange={(e) => handleInputChange("deviceUserNo", e.target.value)}
+                className={getInputClass("deviceUserNo")}
+              />
+              <p className="text-[10px] text-content-muted">
+                The unique number the fingerprint machine shows for this person.
+              </p>
+              {errors.deviceUserNo && (
+                <p className="text-[10px] text-rose-500 font-semibold">{errors.deviceUserNo}</p>
               )}
             </div>
 

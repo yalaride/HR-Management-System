@@ -7,6 +7,7 @@ import dbConnect from "@/lib/mongodb";
 import { Attendance } from "@/modals/Attendance";
 import { Employee } from "@/modals/Employee";
 import { MonthlyAttendance } from "@/modals/MonthlyAttendance";
+import { ActivityLog } from "@/modals/ActivityLog";
 import CompanyDetails from "@/modals/CompanyDetails";
 
 const TIMEZONE = "Asia/Karachi";
@@ -395,4 +396,114 @@ export async function upsertAttendanceRecord(
   await syncMonthlyAttendanceAggregates(userId, year, month);
 
   return { ok: true, record: updatedRecord };
+}
+
+const DUPLICATE_PUNCH_MS = 45_000;
+
+export type DevicePunchResult =
+  | { ok: true; action: "check-in" | "check-out" | "duplicate"; status: string }
+  | { ok: false; status: number; error: string };
+
+/**
+ * Fingerprint punch. The first punch of the Karachi day is check-in.
+ * A later punch updates check-out and keeps the original check-in.
+ */
+export async function recordDevicePunch(input: {
+  userId: string;
+  punchedAt: Date;
+}): Promise<DevicePunchResult> {
+  await dbConnect();
+
+  const { userId, punchedAt } = input;
+  if (!userId || Number.isNaN(punchedAt.getTime())) {
+    return { ok: false, status: 400, error: "Invalid fingerprint punch." };
+  }
+
+  const date = getKarachiDateString(punchedAt);
+  const todayStr = getKarachiDateString();
+  if (date > todayStr) {
+    return { ok: false, status: 400, error: "Fingerprint punch is in the future." };
+  }
+
+  const [year, month] = date.split("-").map((part) => parseInt(part, 10));
+  const monthlyLockCheck = await MonthlyAttendance.findOne({ userId, year, month }).lean();
+  if (monthlyLockCheck?.isLocked) {
+    return {
+      ok: false,
+      status: 400,
+      error: "This month's attendance logs are finalized and locked.",
+    };
+  }
+
+  const settings = await getActiveSettings();
+  const existing = await Attendance.findOne({ userId, date });
+
+  let checkIn = existing?.checkIn ? new Date(existing.checkIn) : null;
+  let checkOut = existing?.checkOut ? new Date(existing.checkOut) : null;
+  let action: "check-in" | "check-out" | "duplicate" = "check-in";
+
+  if (!checkIn) {
+    checkIn = punchedAt;
+    action = "check-in";
+  } else if (Math.abs(punchedAt.getTime() - checkIn.getTime()) < DUPLICATE_PUNCH_MS) {
+    action = "duplicate";
+  } else if (checkOut && Math.abs(punchedAt.getTime() - checkOut.getTime()) < DUPLICATE_PUNCH_MS) {
+    action = "duplicate";
+  } else if (punchedAt.getTime() < checkIn.getTime()) {
+    checkOut = checkOut && checkOut.getTime() > checkIn.getTime() ? checkOut : checkIn;
+    checkIn = punchedAt;
+    action = "check-in";
+  } else {
+    checkOut = punchedAt;
+    action = "check-out";
+  }
+
+  if (action === "duplicate" && existing) {
+    return { ok: true, action, status: existing.status };
+  }
+
+  const calculations = computeDailyShiftsAndHours(checkIn, checkOut, settings);
+  const updatePayload: Record<string, unknown> = {
+    userId,
+    date,
+    checkIn,
+    status: calculations.status,
+  };
+  const updateQuery: Record<string, unknown> = { $set: updatePayload };
+
+  if (checkOut) {
+    updatePayload.checkOut = checkOut;
+    updatePayload.workingHours = calculations.workingHours;
+    updatePayload.formattedDuration = calculations.formattedDuration;
+  } else {
+    updateQuery.$unset = { checkOut: "", workingHours: "", formattedDuration: "" };
+  }
+
+  const updatedRecord = await Attendance.findOneAndUpdate({ userId, date }, updateQuery, {
+    new: true,
+    upsert: true,
+    runValidators: true,
+  });
+
+  await syncMonthlyAttendanceAggregates(userId, year, month);
+
+  if (updatedRecord && action !== "duplicate") {
+    await ActivityLog.create({
+      userId,
+      activityType: action === "check-out" ? "CHECK_OUT" : "CHECK_IN",
+      date,
+      timestamp: punchedAt,
+      description:
+        action === "check-out"
+          ? "Fingerprint check-out recorded"
+          : "Fingerprint check-in recorded",
+      metadata: {
+        attendanceId: updatedRecord._id,
+        status: calculations.status,
+        workingHours: calculations.workingHours,
+      },
+    });
+  }
+
+  return { ok: true, action, status: calculations.status };
 }

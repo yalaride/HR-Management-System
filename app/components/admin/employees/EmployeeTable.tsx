@@ -37,6 +37,7 @@ export interface EmployeeUpdatePayload {
   extendMonths?: number;
   extensionReason?: string;
   confirmationReason?: string;
+  deviceUserNo?: string;
 }
 
 export interface Employee {
@@ -70,6 +71,7 @@ export interface Employee {
   internshipEndDate?: string | null;
   confirmationDate?: string | null;
   extensions?: ExtensionRecord[];
+  deviceUserNo?: string;
 }
 
 interface EmployeeTableProps {
@@ -211,6 +213,11 @@ export default function EmployeeTable({
                             <Mail className="w-3 h-3 shrink-0" />
                             {emp.email}
                           </span>
+                          {emp.deviceUserNo ? (
+                            <span className="text-[10px] font-semibold text-indigo-600 mt-0.5">
+                              Fingerprint {emp.deviceUserNo}
+                            </span>
+                          ) : null}
                         </div>
                       </div>
                     </td>

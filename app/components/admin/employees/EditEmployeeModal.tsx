@@ -68,6 +68,7 @@ export default function EditEmployeeModal({
     name: "",
     email: "",
     designation: "",
+    deviceUserNo: "",
     joinDate: "",
     salary: "",
     department: "",
@@ -158,6 +159,7 @@ export default function EditEmployeeModal({
         name: employee.name || "",
         email: employee.email || "",
         designation: employee.designation || employee.role || "",
+        deviceUserNo: employee.deviceUserNo || "",
         joinDate: formattedDate,
         salary: salaryString,
         department: employee.department || departmentOptions[0] || "",
@@ -253,6 +255,11 @@ export default function EditEmployeeModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.email || !formData.designation) return;
+    const fingerprint = formData.deviceUserNo.trim();
+    if (fingerprint && (!/^\d{1,12}$/.test(fingerprint) || fingerprint.replace(/^0+/, "") === "")) {
+      setExtensionError("Fingerprint number must be digits only, like 14, 15, or 16.");
+      return;
+    }
 
     // Validate reason if HR chooses to extend
     if (reviewAction === "EXTEND" && !extensionReason.trim()) {
@@ -413,6 +420,26 @@ export default function EditEmployeeModal({
               onChange={(e) => handleFieldChange("designation", e.target.value)}
               className={getInputClass()}
             />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">
+              Fingerprint No.
+            </label>
+            <input
+              type="text"
+              inputMode="numeric"
+              placeholder="Same number as the device, e.g. 15"
+              value={formData.deviceUserNo}
+              onChange={(e) => handleFieldChange("deviceUserNo", e.target.value)}
+              className={getInputClass()}
+            />
+            <p className="text-[10px] text-content-muted">
+              Must match the unique number on the fingerprint machine. The first punch of the day is check-in, and a later punch is check-out.
+            </p>
+            {extensionError?.startsWith("Fingerprint") && (
+              <p className="text-[10px] text-rose-500 font-semibold">{extensionError}</p>
+            )}
           </div>
 
           {/* Grid Layout: Join Date, Salary, Department, Status */}

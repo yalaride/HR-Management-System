@@ -84,6 +84,9 @@ const EmployeeSchema = new Schema(
     exitDate: { type: Date, default: null },
     exitReason: { type: String, default: "" },
 
+    // Number printed by the fingerprint device (14, 15, 16). Matches incoming punches.
+    deviceUserNo: { type: String },
+
     // --- Personal & Contact Information ---
     employeeId: { type: String, default: "" },
     profilePhotoUrl: { type: String, default: "" },
@@ -113,5 +116,16 @@ const EmployeeSchema = new Schema(
 EmployeeSchema.index({ department: 1, status: 1 });
 EmployeeSchema.index({ employmentType: 1, reviewStatus: 1 });
 EmployeeSchema.index({ nextReviewDate: 1 });
+EmployeeSchema.index(
+  { deviceUserNo: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { deviceUserNo: { $type: "string" } },
+  }
+);
+
+if (models.Employee && !models.Employee.schema.path("deviceUserNo")) {
+  delete models.Employee;
+}
 
 export const Employee = models.Employee || model("Employee", EmployeeSchema);

@@ -11,6 +11,7 @@ import {
   effectiveEmploymentPeriod,
   isEmploymentPeriodDue,
 } from "@/lib/employment-period";
+import { normalizeDeviceUserNo } from "@/lib/device-user-no";
 
 export async function PUT(
   request: Request,
@@ -43,6 +44,7 @@ export async function PUT(
       extendMonths,      // 1, 2, or 3
       extensionReason,   // Mandatory reason
       confirmationReason,
+      deviceUserNo,
     } = body;
 
     const allowedEmploymentTypes = ["Internship", "Probation", "Permanent", "Contract"];
@@ -394,7 +396,34 @@ export async function PUT(
       }
     }
 
+    let clearedDeviceUserNo = false;
+    if (deviceUserNo !== undefined) {
+      const parsedDeviceUserNo = normalizeDeviceUserNo(deviceUserNo);
+      if (!parsedDeviceUserNo.ok) {
+        return NextResponse.json({ error: parsedDeviceUserNo.error }, { status: 400 });
+      }
+      if (parsedDeviceUserNo.value) {
+        const taken = await Employee.findOne({
+          deviceUserNo: parsedDeviceUserNo.value,
+          _id: { $ne: employee._id },
+        }).select("_id");
+        if (taken) {
+          return NextResponse.json(
+            { error: "This fingerprint number is already assigned to another employee." },
+            { status: 400 }
+          );
+        }
+        employee.deviceUserNo = parsedDeviceUserNo.value;
+      } else {
+        clearedDeviceUserNo = true;
+      }
+    }
+
     await employee.save();
+    if (clearedDeviceUserNo) {
+      await Employee.updateOne({ _id: employee._id }, { $unset: { deviceUserNo: 1 } });
+      employee.deviceUserNo = undefined;
+    }
 
     // Keep the persisted balance aligned with the joining month. This also
     // materializes balances for legacy employees when they become Permanent.
@@ -442,6 +471,7 @@ export async function PUT(
       lifecycleDurationMonths: employee.lifecycleDurationMonths ?? null,
       confirmationDate: employee.confirmationDate ? employee.confirmationDate.toISOString() : null,
       extensions: employee.extensions || [],
+      deviceUserNo: employee.deviceUserNo || "",
     };
 
     return NextResponse.json({
