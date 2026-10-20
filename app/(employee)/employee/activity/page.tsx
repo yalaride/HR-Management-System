@@ -14,6 +14,7 @@ interface Activity {
   createdAt: string;
 }
 
+
 export default function EmployeeActivityPage() {
   const router = useRouter();
   const [search, setSearch] = useState("");
