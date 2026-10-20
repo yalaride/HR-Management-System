@@ -10,6 +10,7 @@ import { syncDueReviews } from "@/lib/cron/sync-reviews";
 import { applyEmployeeLeaveProration } from "@/lib/leave-proration";
 import { effectiveEmploymentPeriod } from "@/lib/employment-period";
 import { normalizeDeviceUserNo } from "@/lib/device-user-no";
+import { getProfileCompletion } from "@/lib/profile-completion";
 
 interface EmployeeExtension {
   type?: string;
@@ -56,12 +57,19 @@ export async function GET() {
       confirmationDate?: Date | null;
       extensions?: EmployeeExtension[];
       deviceUserNo?: string | null;
+      phoneNumber?: string | null;
+      address?: string | null;
+      dateOfBirth?: Date | null;
+      gender?: string | null;
+      maritalStatus?: string | null;
+      emergencyContactName?: string | null;
+      emergencyContactPhone?: string | null;
       userId?: { email?: string } | null;
     }
 
     const employees = (await Employee.find({ status: { $ne: "Inactive" } })
       .select(
-        "name department status designation joinDate salary hourlyRate profilePhotoUrl profilePhotoURL userId employmentType reviewStatus periodStartDate periodEndDate lifecycleDurationMonths nextReviewDate probationEndDate internshipEndDate confirmationDate extensions deviceUserNo"
+        "name department status designation joinDate salary hourlyRate profilePhotoUrl profilePhotoURL phoneNumber address dateOfBirth gender maritalStatus emergencyContactName emergencyContactPhone userId employmentType reviewStatus periodStartDate periodEndDate lifecycleDurationMonths nextReviewDate probationEndDate internshipEndDate confirmationDate extensions deviceUserNo"
       )
       .populate("userId", "email")
       .sort({ createdAt: -1 })
@@ -103,6 +111,7 @@ export async function GET() {
           : null,
         extensions: emp.extensions || [],
         deviceUserNo: emp.deviceUserNo || "",
+        profileCompletion: getProfileCompletion(emp).percent,
       };
     });
 

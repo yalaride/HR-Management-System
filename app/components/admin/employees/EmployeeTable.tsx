@@ -72,6 +72,7 @@ export interface Employee {
   confirmationDate?: string | null;
   extensions?: ExtensionRecord[];
   deviceUserNo?: string;
+  profileCompletion?: number;
 }
 
 interface EmployeeTableProps {
@@ -216,6 +217,11 @@ export default function EmployeeTable({
                           {emp.deviceUserNo ? (
                             <span className="text-[10px] font-semibold text-indigo-600 mt-0.5">
                               Fingerprint {emp.deviceUserNo}
+                            </span>
+                          ) : null}
+                          {typeof emp.profileCompletion === "number" && emp.profileCompletion < 100 ? (
+                            <span className="text-[10px] font-semibold text-amber-700 mt-0.5">
+                              Profile {emp.profileCompletion}%
                             </span>
                           ) : null}
                         </div>

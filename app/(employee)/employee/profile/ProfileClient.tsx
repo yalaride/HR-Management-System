@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import ProfilePhotoUploader from "./ProfilePhotoUploader";
 import PasswordInputWithToggle from "@/app/components/PasswordInputWithToggle";
+import { getProfileCompletion } from "@/lib/profile-completion";
 
 type ProfileState = {
   fullName: string;
@@ -128,21 +129,10 @@ export default function ProfileClient() {
     return value.replace(/\D/g, "");
   };
 
-  const completionPercentage = useMemo(() => {
-    const keysToTrack: (keyof ProfileState)[] = [
-      "profilePhotoUrl",
-      "phoneNumber",
-      "address",
-      "dateOfBirth",
-      "gender",
-      "maritalStatus",
-      "emergencyContactName",
-      "emergencyContactPhone",
-    ];
-
-    const filled = keysToTrack.filter((key) => !!profile[key]?.trim());
-    return Math.round((filled.length / keysToTrack.length) * 100);
-  }, [profile]);
+  const completionPercentage = useMemo(
+    () => getProfileCompletion(profile).percent,
+    [profile]
+  );
 
   const canSave = useMemo(() => {
     return !saving && !uploadingPhoto;

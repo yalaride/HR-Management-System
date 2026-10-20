@@ -60,6 +60,14 @@ const getClientDate = () =>
   new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
 const getServerDate = () => "";
 
+interface IncompleteProfile {
+  name: string;
+  department?: string;
+  designation?: string;
+  percent: number;
+  missingFields: string[];
+}
+
 interface DashboardStatsResponse {
   totalEmployees: number;
   totalDepartments: number;
@@ -68,6 +76,9 @@ interface DashboardStatsResponse {
   presentToday: number;
   todayBirthdays: TodayBirthday[];
   upcomingBirthdays?: UpcomingBirthday[];
+  profileCompletionPercent?: number;
+  incompleteProfileCount?: number;
+  incompleteProfiles?: IncompleteProfile[];
 }
 
 export default function AdminDashboardPage() {
@@ -86,6 +97,7 @@ export default function AdminDashboardPage() {
   const dashboardStats = data ?? null;
   const todayBirthdays = Array.isArray(data?.todayBirthdays) ? data.todayBirthdays : [];
   const upcomingBirthdays = Array.isArray(data?.upcomingBirthdays) ? data.upcomingBirthdays : [];
+  const incompleteProfiles = Array.isArray(data?.incompleteProfiles) ? data.incompleteProfiles : [];
   const statsLoading = isLoading;
   const statsError = error ? (error instanceof Error ? error.message : "Failed to load dashboard stats") : null;
 
@@ -223,6 +235,50 @@ export default function AdminDashboardPage() {
               colorClass={stat.colorClass}
             />
           ))}
+        </div>
+
+        <div className="panel p-6 space-y-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div className="min-w-0">
+              <h2 className="text-base font-semibold text-content-main">Profile completion</h2>
+              <p className="text-xs text-content-secondary mt-0.5">
+                Employees who still need to finish their own profile.
+              </p>
+            </div>
+            <p className="text-sm font-bold text-content-main shrink-0">
+              {statsLoading ? "—" : `${dashboardStats?.profileCompletionPercent ?? 0}% filled`}
+            </p>
+          </div>
+
+          {statsLoading ? (
+            <p className="text-xs text-content-secondary">Loading profile status...</p>
+          ) : incompleteProfiles.length === 0 ? (
+            <p className="text-xs font-medium text-emerald-700">Every active employee profile is complete.</p>
+          ) : (
+            <ul className="max-h-80 space-y-3 overflow-y-auto">
+              {incompleteProfiles.map((person, index) => (
+                <li key={`${person.name}-${person.department}-${index}`} className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-semibold text-content-main capitalize">{person.name}</p>
+                      <p className="truncate text-[11px] text-content-secondary">
+                        {[person.designation, person.department].filter(Boolean).join(" · ")}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-xs font-bold text-amber-700">{person.percent}%</span>
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+                    <div className="h-full rounded-full bg-amber-500" style={{ width: `${person.percent}%` }} />
+                  </div>
+                  {person.missingFields.length > 0 && (
+                    <p className="text-[11px] text-content-muted truncate">
+                      Missing: {person.missingFields.join(", ")}
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         {/* Modular Birthday Celebrants Section */}

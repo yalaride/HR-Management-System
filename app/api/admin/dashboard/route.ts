@@ -10,6 +10,7 @@ import {
   mongoDobMatchesMonthDays,
   shiftKarachiMonthDay,
 } from "@/lib/birthday-date";
+import { getProfileCompletion, type ProfileCompletionInput } from "@/lib/profile-completion";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,7 @@ export async function GET() {
       upcomingMonthDays.push(shiftKarachiMonthDay(new Date(), i));
     }
 
-    const [totalEmployees, departments, pendingLeaves, presentTodayCount, todayBirthdays, upcomingBirthdaysRaw] =
+    const [totalEmployees, departments, pendingLeaves, presentTodayCount, todayBirthdays, upcomingBirthdaysRaw, profileEmployees] =
       await Promise.all([
         Employee.countDocuments(activeEmployeesFilter),
         Employee.distinct("department", activeEmployeesFilter),
@@ -55,6 +56,12 @@ export async function GET() {
           ...mongoDobMatchesMonthDays(upcomingMonthDays),
         })
           .select("name department designation profilePhotoUrl dateOfBirth")
+          .lean(),
+        Employee.find(activeEmployeesFilter)
+          .select(
+            "name department designation profilePhotoUrl phoneNumber address dateOfBirth gender maritalStatus emergencyContactName emergencyContactPhone"
+          )
+          .sort({ name: 1 })
           .lean(),
       ]);
 
@@ -101,6 +108,31 @@ export async function GET() {
       })
       .sort((a, b) => a.daysUntil - b.daysUntil);
 
+    const profileRows = (
+      profileEmployees as ({
+        name?: string;
+        department?: string;
+        designation?: string;
+      } & ProfileCompletionInput)[]
+    ).map((emp) => {
+      const completion = getProfileCompletion(emp);
+      return {
+        name: emp.name || "Employee",
+        department: emp.department || "",
+        designation: emp.designation || "",
+        percent: completion.percent,
+        missingFields: completion.missingFields,
+        complete: completion.complete,
+      };
+    });
+    const incompleteProfiles = profileRows
+      .filter((row) => !row.complete)
+      .sort((a, b) => a.percent - b.percent || a.name.localeCompare(b.name));
+    const profileCompletionPercent =
+      profileRows.length > 0
+        ? Math.round(profileRows.reduce((sum, row) => sum + row.percent, 0) / profileRows.length)
+        : 100;
+
     return NextResponse.json(
       {
         totalEmployees,
@@ -110,6 +142,9 @@ export async function GET() {
         presentToday: totalEmployees > 0 ? presentTodayCount : 0,
         todayBirthdays,
         upcomingBirthdays,
+        profileCompletionPercent,
+        incompleteProfileCount: incompleteProfiles.length,
+        incompleteProfiles,
       },
       { status: 200 }
     );

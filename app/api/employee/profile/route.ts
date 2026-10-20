@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { Employee } from "@/modals/Employee"; // Preserving exact model path
 import { cloudinary, ensureCloudinaryConfigured } from "@/lib/cloudinary";
+import { getProfileCompletion } from "@/lib/profile-completion";
 
 /**
  * Utility to extract Cloudinary's public_id from a full URL
@@ -82,6 +83,23 @@ export async function GET() {
         emergencyContactPhone: employee.emergencyContactPhone || "",
 
         updatedAt: employee.updatedAt,
+        ...(() => {
+          const completion = getProfileCompletion({
+            profilePhotoUrl: employee.profilePhotoUrl,
+            phoneNumber: employee.phoneNumber,
+            address: employee.address,
+            dateOfBirth: employee.dateOfBirth,
+            gender: employee.gender,
+            maritalStatus: employee.maritalStatus,
+            emergencyContactName: employee.emergencyContactName,
+            emergencyContactPhone: employee.emergencyContactPhone,
+          });
+          return {
+            completionPercent: completion.percent,
+            missingFields: completion.missingFields,
+            profileComplete: completion.complete,
+          };
+        })(),
       },
       { status: 200 }
     );
