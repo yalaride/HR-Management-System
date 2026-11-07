@@ -212,27 +212,6 @@ export default function Home() {
             Syncup<span className="text-brand-accent">.</span>
           </span>
         </div>
-
-        {/* Header Badges */}
-        <div className="flex items-center gap-[12px]">
-          
-          {/* Status Badge */}
-          <div className="inline-flex items-center gap-[8px] px-[14px] py-[6px] rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[13px] font-semibold text-emerald-700">
-            <span className="relative flex h-[8px] w-[8px]">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-[8px] w-[8px] bg-emerald-500" />
-            </span>
-            <span className="hidden sm:inline">Systems Normal</span>
-            <span className="sm:hidden">Online</span>
-          </div>
-
-          {/* Version Tag - Using Brand Theme Accent */}
-          <span className="px-[14px] py-[6px] rounded-full bg-brand-subtle text-brand-accent border border-brand-accent/20 text-[13px] font-bold">
-            v2.4
-          </span>
-
-        </div>
-
       </header>
 
       {/* Main Split Content */}
