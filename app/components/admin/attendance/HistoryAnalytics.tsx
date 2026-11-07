@@ -4,6 +4,29 @@ import React, { useEffect, useState, useRef } from "react";
 import { TrendingUp, BarChart3, ChevronDown, Lock, Edit2 } from "lucide-react";
 import RetroLogModal from "./RetroLogModal";
 
+function karachiMonthLabel(offsetMonths: number): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Karachi",
+    year: "numeric",
+    month: "numeric",
+  }).formatToParts(new Date());
+  let year = Number(parts.find((part) => part.type === "year")?.value);
+  let month = Number(parts.find((part) => part.type === "month")?.value) + offsetMonths;
+  while (month < 1) {
+    month += 12;
+    year -= 1;
+  }
+  while (month > 12) {
+    month -= 12;
+    year += 1;
+  }
+  return new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
 interface Employee {
   id: string;
   userId: string;
@@ -270,7 +293,7 @@ export default function HistoryAnalytics({
                     : "bg-white text-content-secondary border-line-subtle hover:bg-slate-50"
                 }`}
               >
-                Last Month (June 2026)
+                Last Month ({karachiMonthLabel(-1)})
               </button>
               <button
                 onClick={() => onPeriodChange("this-month")}
@@ -280,7 +303,7 @@ export default function HistoryAnalytics({
                     : "bg-white text-content-secondary border-line-subtle hover:bg-slate-50"
                 }`}
               >
-                This Month (July 2026)
+                This Month ({karachiMonthLabel(0)})
               </button>
               <button
                 onClick={() => onPeriodChange("all")}
