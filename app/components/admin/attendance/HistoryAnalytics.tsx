@@ -255,8 +255,8 @@ export default function HistoryAnalytics({
               className="w-full px-3.5 py-2.5 bg-surface-card border border-line-subtle rounded-xl text-xs text-content-main transition-all duration-200 shadow-sm outline-none hover:border-brand-accent/50 focus:ring-2 focus:ring-brand-accent/20 focus:border-brand-accent flex items-center justify-between text-left cursor-pointer relative font-semibold"
             >
               <span>
-                {selectedEmp 
-                  ? `${selectedEmp.name} (${selectedEmp.department})` 
+                {selectedEmp
+                  ? `${selectedEmp.name}${selectedEmp.designation ? ` (${selectedEmp.designation})` : ""}`
                   : "Select an Employee..."}
               </span>
               <ChevronDown 
@@ -280,7 +280,7 @@ export default function HistoryAnalytics({
                       selectedEmployeeId === e.userId ? "dropdown-option-active" : ""
                     }`}
                   >
-                    {e.name} ({e.department})
+                    {e.name}{e.designation ? ` (${e.designation})` : ""}
                   </button>
                 ))}
               </div>

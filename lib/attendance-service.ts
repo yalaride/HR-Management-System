@@ -185,7 +185,7 @@ export async function getDayAttendanceSheet(date: string, options: DaySheetOptio
 
   const settings = await getActiveSettings();
 
-  const employeeQuery: Record<string, unknown> = { status: { $ne: "Inactive" } };
+  const employeeQuery: Record<string, unknown> = { status: { $nin: ["Inactive", "Terminated"] } };
   if (options.department) {
     employeeQuery.department = options.department;
   }
