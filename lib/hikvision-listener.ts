@@ -9,6 +9,9 @@ const FAIL_SUB_EVENTS = new Set([
   6, 7, 8, 9, 10, 21, 22, 23, 39, 40, 41, 42, 43, 44, 45, 46, 51, 52, 76, 77, 78, 79, 80,
 ]);
 
+// HikCentral Access Control access-denied event types.
+const FAIL_CENTRAL_EVENTS = new Set([197127, 197128, 197151, 197160, 197161]);
+
 function secretsMatch(provided: string | null | undefined, expected: string): boolean {
   if (!provided) return false;
   const left = Buffer.from(provided);
@@ -98,41 +101,23 @@ export interface ParsedHikvisionEvent {
   punchedAt?: Date;
 }
 
-export function parseHikvisionEvent(body: string): ParsedHikvisionEvent {
-  const trimmed = body.trim();
-  if (!trimmed) return { kind: "ignored" };
-
-  let employeeNo: string | null = null;
-  let dateTime: string | null = null;
-  let eventType: string | null = null;
-  let subEventType: string | null = null;
-
-  if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
-    try {
-      const json = JSON.parse(trimmed) as unknown;
-      eventType = findInJson(json, ["eventType", "event_type"]);
-      employeeNo = findInJson(json, ["employeeNoString", "employeeNo", "employeeNoID"]);
-      dateTime = findInJson(json, ["dateTime", "time"]);
-      subEventType = findInJson(json, ["subEventType", "minor"]);
-    } catch {
-      return { kind: "ignored" };
-    }
-  } else {
-    eventType = tagValue(trimmed, "eventType");
-    employeeNo =
-      tagValue(trimmed, "employeeNoString") ||
-      tagValue(trimmed, "employeeNo") ||
-      tagValue(trimmed, "employeeNoID");
-    dateTime = tagValue(trimmed, "dateTime");
-    subEventType = tagValue(trimmed, "subEventType") || tagValue(trimmed, "minor");
-  }
-
+function classifyPunch(
+  employeeNo: string | null,
+  dateTime: string | null,
+  eventType: string | null,
+  subEventType: string | null
+): ParsedHikvisionEvent {
   if (eventType && /heartbeat|videoloss/i.test(eventType)) {
     return { kind: "heartbeat" };
   }
 
+  const centralCode = eventType ? Number(eventType) : NaN;
+  if (Number.isFinite(centralCode) && FAIL_CENTRAL_EVENTS.has(centralCode)) {
+    return { kind: "ignored" };
+  }
+
   if (!employeeNo || employeeNo === "0") {
-    return { kind: eventType && /heartbeat/i.test(eventType) ? "heartbeat" : "ignored" };
+    return { kind: "ignored" };
   }
 
   const subCode = subEventType ? Number(subEventType) : NaN;
@@ -145,6 +130,72 @@ export function parseHikvisionEvent(body: string): ParsedHikvisionEvent {
     employeeNo,
     punchedAt: parseDeviceDateTime(dateTime),
   };
+}
+
+function parseCentralEvents(json: unknown): ParsedHikvisionEvent[] | null {
+  if (!json || typeof json !== "object" || Array.isArray(json)) return null;
+  const params = (json as Record<string, unknown>).params;
+  if (!params || typeof params !== "object" || Array.isArray(params)) return null;
+  const events = (params as Record<string, unknown>).events;
+  if (!Array.isArray(events)) return null;
+
+  return events.map((event) => {
+    if (!event || typeof event !== "object") return { kind: "ignored" as const };
+    const record = event as Record<string, unknown>;
+    const data =
+      record.data && typeof record.data === "object" && !Array.isArray(record.data)
+        ? (record.data as Record<string, unknown>)
+        : record;
+    const employeeNo =
+      readJsonString(data.personCode) ||
+      readJsonString(data.employeeNoString) ||
+      readJsonString(data.employeeNo) ||
+      readJsonString(record.personCode);
+    const dateTime = readJsonString(record.happenTime) || readJsonString(record.sendTime);
+    const eventType = readJsonString(record.eventType);
+    return classifyPunch(employeeNo, dateTime, eventType, null);
+  });
+}
+
+export function parseHikvisionEvents(body: string): ParsedHikvisionEvent[] {
+  const trimmed = body.trim();
+  if (!trimmed) return [{ kind: "ignored" }];
+
+  if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+    try {
+      const json = JSON.parse(trimmed) as unknown;
+      const central = parseCentralEvents(json);
+      if (central) return central.length > 0 ? central : [{ kind: "ignored" }];
+
+      return [
+        classifyPunch(
+          findInJson(json, ["employeeNoString", "employeeNo", "employeeNoID", "personCode"]),
+          findInJson(json, ["dateTime", "happenTime", "time"]),
+          findInJson(json, ["eventType", "event_type"]),
+          findInJson(json, ["subEventType", "minor"])
+        ),
+      ];
+    } catch {
+      return [{ kind: "ignored" }];
+    }
+  }
+
+  return [
+    classifyPunch(
+      tagValue(trimmed, "employeeNoString") ||
+        tagValue(trimmed, "employeeNo") ||
+        tagValue(trimmed, "employeeNoID") ||
+        tagValue(trimmed, "personCode"),
+      tagValue(trimmed, "dateTime") || tagValue(trimmed, "happenTime"),
+      tagValue(trimmed, "eventType"),
+      tagValue(trimmed, "subEventType") || tagValue(trimmed, "minor")
+    ),
+  ];
+}
+
+export function parseHikvisionEvent(body: string): ParsedHikvisionEvent {
+  const events = parseHikvisionEvents(body);
+  return events.find((event) => event.kind === "punch") || events[0] || { kind: "ignored" };
 }
 
 export function hikvisionProbeResponse(token: string | null): NextResponse {
@@ -177,41 +228,51 @@ export async function handleHikvisionEvent(
   }
 
   const body = await request.text();
-  const event = parseHikvisionEvent(body);
-  if (event.kind !== "punch" || !event.employeeNo || !event.punchedAt) {
+  const punches = parseHikvisionEvents(body).filter(
+    (event) => event.kind === "punch" && event.employeeNo && event.punchedAt
+  );
+  if (punches.length === 0) {
     return NextResponse.json({ ok: true, ignored: true });
   }
 
   await dbConnect();
-  const keys = deviceUserNoLookupKeys(event.employeeNo);
-  const employee = await Employee.findOne({ deviceUserNo: { $in: keys } })
-    .select("userId status deviceUserNo name")
-    .lean<{ userId?: unknown; status?: string } | null>();
+  const results = [];
+  for (const event of punches) {
+    const keys = deviceUserNoLookupKeys(event.employeeNo as string);
+    const employee = await Employee.findOne({ deviceUserNo: { $in: keys } })
+      .select("userId status deviceUserNo name")
+      .lean<{ userId?: unknown; status?: string } | null>();
 
-  if (!employee?.userId) {
-    console.warn(`Hikvision punch ${keys.join("/")} did not match an employee.`);
-    return NextResponse.json({ ok: true, matched: false });
+    if (!employee?.userId) {
+      console.warn(`Hikvision punch ${keys.join("/")} did not match an employee.`);
+      results.push({ matched: false });
+      continue;
+    }
+
+    if (employee.status === "Inactive" || employee.status === "Terminated") {
+      results.push({ matched: true, ignored: "inactive" });
+      continue;
+    }
+
+    const result = await recordDevicePunch({
+      userId: String(employee.userId),
+      punchedAt: event.punchedAt as Date,
+    });
+
+    if (!result.ok) {
+      console.error("Hikvision punch rejected:", result.error);
+      results.push({ matched: true, stored: false });
+      continue;
+    }
+
+    results.push({
+      matched: true,
+      stored: result.action !== "duplicate",
+      action: result.action,
+      status: result.status,
+    });
   }
 
-  if (employee.status === "Inactive" || employee.status === "Terminated") {
-    return NextResponse.json({ ok: true, matched: true, ignored: "inactive" });
-  }
-
-  const result = await recordDevicePunch({
-    userId: String(employee.userId),
-    punchedAt: event.punchedAt,
-  });
-
-  if (!result.ok) {
-    console.error("Hikvision punch rejected:", result.error);
-    return NextResponse.json({ ok: true, matched: true, stored: false });
-  }
-
-  return NextResponse.json({
-    ok: true,
-    matched: true,
-    stored: result.action !== "duplicate",
-    action: result.action,
-    status: result.status,
-  });
+  const first = results[0];
+  return NextResponse.json({ ok: true, ...first, count: results.length });
 }

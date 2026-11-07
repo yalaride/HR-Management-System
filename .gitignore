@@ -42,3 +42,6 @@ next-env.d.ts
 
 # allow env template
 !.env.example
+
+# Office PC bridge settings (device password and listener URL)
+scripts/hikvision-bridge.config.ps1

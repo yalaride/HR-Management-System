@@ -453,9 +453,11 @@ export async function recordDevicePunch(input: {
     checkOut = checkOut && checkOut.getTime() > checkIn.getTime() ? checkOut : checkIn;
     checkIn = punchedAt;
     action = "check-in";
-  } else {
+  } else if (!checkOut || punchedAt.getTime() > checkOut.getTime()) {
     checkOut = punchedAt;
     action = "check-out";
+  } else {
+    action = "duplicate";
   }
 
   if (action === "duplicate" && existing) {
