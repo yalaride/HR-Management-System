@@ -4,5 +4,5 @@
 $DeviceHost = "192.168.18.63"
 $DeviceUser = "admin"
 $DevicePassword = ""
-$HrListenerUrl = ""
-$LookbackHours = 12
+$HrListenerUrl = "https://hr-management-system-rose.vercel.app/api/hikvision/events/60909d5e73b3fb6f6900f33db943d466e5992c37801d9271"
+$LookbackHours = 84

@@ -17,6 +17,8 @@ interface EditAttendanceModalProps {
     isLocked: boolean;
   };
   onSave: (payload: { userId: string; date: string; checkIn: string | null; checkOut: string | null; status: "On Time" | "Late" | "Absent" }) => Promise<void>;
+  shiftStart?: string;
+  gracePeriod?: number;
 }
 
 export default function EditAttendanceModal({
@@ -26,6 +28,8 @@ export default function EditAttendanceModal({
   date,
   initialData,
   onSave,
+  shiftStart = "09:00",
+  gracePeriod = 15,
 }: EditAttendanceModalProps) {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -35,6 +39,18 @@ export default function EditAttendanceModal({
   const [checkOutTime, setCheckOutTime] = useState(initialData.checkOut);
   const [enableCheckOut, setEnableCheckOut] = useState(initialData.enableCheckOut);
   const [status, setStatus] = useState<"On Time" | "Late" | "Absent">(initialData.status);
+
+  const minutesOf = (value: string) => {
+    const [hours, minutes] = value.split(":").map((part) => Number(part) || 0);
+    return hours * 60 + minutes;
+  };
+
+  const applyCheckInTime = (value: string) => {
+    setCheckInTime(value);
+    if (status === "Absent") return;
+    const lateAfter = minutesOf(shiftStart) + gracePeriod;
+    setStatus(minutesOf(value) > lateAfter ? "Late" : "On Time");
+  };
 
   // Status Select visibility controls
   const [isStatusOpen, setIsStatusOpen] = useState(false);
@@ -154,7 +170,7 @@ export default function EditAttendanceModal({
                       type="time"
                       required
                       value={checkInTime}
-                      onChange={(e) => setCheckInTime(e.target.value)}
+                      onChange={(e) => applyCheckInTime(e.target.value)}
                       className={elementStyle}
                     />
                   </div>

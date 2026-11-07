@@ -11,6 +11,7 @@ import {
   X, 
   CheckCircle2,
   CalendarDays,
+  CalendarOff,
   ChevronDown,
   UserMinus,
   Activity
@@ -20,6 +21,7 @@ import PayslipList from "@/app/components/payslips/PayslipList";
 import { PayslipRecord } from "@/app/components/payslips/payslipPdf";
 import { MetricCard } from "@/app/components/admin/dashbord/MetricCard";
 import BirthdayGreetingBanner from "@/app/components/employee/dashbord/BirthdayGreetingBanner";
+import { formatHolidayDate } from "@/lib/holiday-announcement";
 
 interface TodayAttendanceRecord {
   checkOut?: string;
@@ -117,6 +119,9 @@ export default function EmployeeDashboardPage() {
   const { data: birthdayData } = useSWR<{ isBirthday?: boolean; name?: string }>(
     "/api/employee/my-birthday"
   );
+  const { data: holidayData } = useSWR<{
+    holidays?: { _id: string; title: string; startDate: string; endDate: string }[];
+  }>("/api/employee/holidays");
 
   const todayRecord = attendanceData?.todayRecord || null;
   const isBirthday = Boolean(birthdayData?.isBirthday);
@@ -262,6 +267,27 @@ export default function EmployeeDashboardPage() {
 
       {/* Birthday Banner */}
       <BirthdayGreetingBanner isBirthday={isBirthday} birthdayName={birthdayName} />
+
+      {(holidayData?.holidays || []).length > 0 && (
+        <section className="rounded-2xl border border-sky-100 bg-sky-50/70 p-4">
+          <div className="flex items-center gap-2 text-sky-800">
+            <CalendarOff className="h-4 w-4" />
+            <h2 className="text-sm font-bold">Upcoming office holidays</h2>
+          </div>
+          <ul className="mt-3 space-y-2">
+            {holidayData?.holidays?.map((holiday) => (
+              <li key={holiday._id} className="text-xs text-sky-900">
+                <span className="font-bold">{holiday.title}</span>
+                <span className="mt-0.5 block text-sky-800">
+                  {holiday.startDate === holiday.endDate
+                    ? formatHolidayDate(holiday.startDate)
+                    : `${formatHolidayDate(holiday.startDate)} to ${formatHolidayDate(holiday.endDate)}`}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {/* Notice Alert */}
       {leaveAppliedNotice && (

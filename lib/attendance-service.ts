@@ -9,6 +9,7 @@ import { Employee } from "@/modals/Employee";
 import { MonthlyAttendance } from "@/modals/MonthlyAttendance";
 import { ActivityLog } from "@/modals/ActivityLog";
 import CompanyDetails from "@/modals/CompanyDetails";
+import { Holiday } from "@/modals/Holiday";
 
 const TIMEZONE = "Asia/Karachi";
 
@@ -52,6 +53,26 @@ function timeToMinutes(timeStr: string): number {
   if (!timeStr) return 0;
   const [h, m] = timeStr.split(":").map((num) => parseInt(num, 10));
   return (h || 0) * 60 + (m || 0);
+}
+
+/** A Karachi calendar day plus a clock time, stored as UTC. Pakistan is UTC+5. */
+function karachiWallTime(dateStr: string, hhmm: string): Date {
+  const [year, month, day] = dateStr.split("-").map((part) => parseInt(part, 10));
+  const [hour, minute] = hhmm.split(":").map((part) => parseInt(part, 10) || 0);
+  return new Date(Date.UTC(year, month - 1, day, hour - 5, minute, 0, 0));
+}
+
+/** A punch after shift end is recorded as the shift-end time. */
+function clampCheckOutToShiftEnd(
+  dateStr: string,
+  checkOut: Date,
+  settings: AttendanceSettings
+): Date {
+  const shiftStart = settings.shiftStart || "09:00";
+  const shiftEnd = settings.shiftEnd || "17:00";
+  if (timeToMinutes(shiftEnd) < timeToMinutes(shiftStart)) return checkOut;
+  const shiftEndAt = karachiWallTime(dateStr, shiftEnd);
+  return checkOut.getTime() > shiftEndAt.getTime() ? shiftEndAt : checkOut;
 }
 
 /** Fetches active settings or defaults */
@@ -205,10 +226,13 @@ export async function getDayAttendanceSheet(date: string, options: DaySheetOptio
     employeeFind.select("userId name designation department employeeId profilePhotoUrl status joinDate");
   }
 
-  const [employees, allLogs, allMonthlyRecords] = await Promise.all([
+  const [employees, allLogs, allMonthlyRecords, holiday] = await Promise.all([
     employeeFind.lean(),
     Attendance.find({ date }).lean(),
     MonthlyAttendance.find({ year, month }).lean(),
+    Holiday.findOne({ startDate: { $lte: date }, endDate: { $gte: date } })
+      .select("title startDate endDate")
+      .lean<{ title: string; startDate: string; endDate: string } | null>(),
   ]);
 
   type LeanEmployeeDoc = Record<string, unknown> & { userId?: unknown; shiftTime?: string };
@@ -238,6 +262,7 @@ export async function getDayAttendanceSheet(date: string, options: DaySheetOptio
     monthlyRecords,
     shiftTimeLabel,
     companySettings: settings,
+    holiday: holiday ? { title: holiday.title, startDate: holiday.startDate, endDate: holiday.endDate } : null,
   };
 }
 
@@ -354,10 +379,14 @@ export async function upsertAttendanceRecord(
 
   const settings = await getActiveSettings();
   const checkInDate = checkIn ? new Date(checkIn) : null;
-  const checkOutDate = checkOut ? new Date(checkOut) : null;
+  let checkOutDate = checkOut ? new Date(checkOut) : null;
+  if (checkInDate && checkOutDate) {
+    checkOutDate = clampCheckOutToShiftEnd(date, checkOutDate, settings);
+  }
 
   const calculations = computeDailyShiftsAndHours(checkInDate, checkOutDate, settings);
-  const finalStatus = status ? status : calculations.status;
+  // Arrival status follows the saved check-in time. A corrected time clears an old Late flag.
+  const finalStatus = status === "Absent" || !checkInDate ? "Absent" : calculations.status;
 
   const updatePayload: Record<string, unknown> = {
     userId,
@@ -438,27 +467,28 @@ export async function recordDevicePunch(input: {
   const settings = await getActiveSettings();
   const existing = await Attendance.findOne({ userId, date });
 
-  let checkIn = existing?.checkIn ? new Date(existing.checkIn) : null;
-  let checkOut = existing?.checkOut ? new Date(existing.checkOut) : null;
-  let action: "check-in" | "check-out" | "duplicate" = "check-in";
-
-  if (!checkIn) {
-    checkIn = punchedAt;
-    action = "check-in";
-  } else if (Math.abs(punchedAt.getTime() - checkIn.getTime()) < DUPLICATE_PUNCH_MS) {
-    action = "duplicate";
-  } else if (checkOut && Math.abs(punchedAt.getTime() - checkOut.getTime()) < DUPLICATE_PUNCH_MS) {
-    action = "duplicate";
-  } else if (punchedAt.getTime() < checkIn.getTime()) {
-    checkOut = checkOut && checkOut.getTime() > checkIn.getTime() ? checkOut : checkIn;
-    checkIn = punchedAt;
-    action = "check-in";
-  } else if (!checkOut || punchedAt.getTime() > checkOut.getTime()) {
-    checkOut = punchedAt;
-    action = "check-out";
-  } else {
-    action = "duplicate";
+  const stamps = [existing?.checkIn, existing?.checkOut, punchedAt]
+    .map((value) => (value ? new Date(value) : null))
+    .filter((value): value is Date => value !== null && !Number.isNaN(value.getTime()))
+    .map((value) => value.getTime());
+  const earliest = new Date(Math.min(...stamps));
+  const latest = new Date(Math.max(...stamps));
+  const checkIn = earliest;
+  let checkOut = latest.getTime() - earliest.getTime() >= DUPLICATE_PUNCH_MS ? latest : null;
+  if (checkOut) {
+    checkOut = clampCheckOutToShiftEnd(date, checkOut, settings);
+    if (checkOut.getTime() - checkIn.getTime() < DUPLICATE_PUNCH_MS) checkOut = null;
   }
+
+  const previousCheckIn = existing?.checkIn ? new Date(existing.checkIn).getTime() : null;
+  const previousCheckOut = existing?.checkOut ? new Date(existing.checkOut).getTime() : null;
+  const checkInChanged = previousCheckIn !== checkIn.getTime();
+  const checkOutChanged = (previousCheckOut ?? null) !== (checkOut ? checkOut.getTime() : null);
+  const action: "check-in" | "check-out" | "duplicate" = !checkInChanged && !checkOutChanged
+    ? "duplicate"
+    : checkOut && punchedAt.getTime() === checkOut.getTime() && punchedAt.getTime() !== checkIn.getTime()
+      ? "check-out"
+      : "check-in";
 
   if (action === "duplicate" && existing) {
     return { ok: true, action, status: existing.status };

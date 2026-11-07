@@ -15,38 +15,62 @@ if ([string]::IsNullOrWhiteSpace($DevicePassword) -or [string]::IsNullOrWhiteSpa
   Write-Error "Set DevicePassword and HrListenerUrl in hikvision-bridge.config.ps1."
 }
 
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-[Net.ServicePointManager]::ServerCertificateValidationCallback = { $true }
+function Get-XmlText {
+  param($Node, [string]$Name)
+  if (-not $Node) { return "" }
+  $found = $Node.SelectSingleNode("*[local-name()='$Name']")
+  if ($found) { return [string]$found.InnerText }
+  return ""
+}
 
-function Invoke-DeviceJson {
-  param([string]$Url, [string]$Body)
-
-  $request = [Net.HttpWebRequest]::Create($Url)
-  $request.Method = "POST"
-  $request.Accept = "application/json"
-  $request.ContentType = "application/json"
-  $request.Timeout = 20000
-  $cache = New-Object Net.CredentialCache
-  $cache.Add((New-Object Uri($Url)), "Digest", (New-Object Net.NetworkCredential($DeviceUser, $DevicePassword)))
-  $request.Credentials = $cache
-
-  $bytes = [Text.Encoding]::UTF8.GetBytes($Body)
-  $request.ContentLength = $bytes.Length
-  $stream = $request.GetRequestStream()
-  $stream.Write($bytes, 0, $bytes.Length)
-  $stream.Close()
-
-  try {
-    $response = $request.GetResponse()
-  } catch [Net.WebException] {
-    if (-not $_.Exception.Response) { throw }
-    $response = $_.Exception.Response
+function Convert-AcsResponse {
+  param([string]$Raw)
+  $trim = $Raw.Trim()
+  if ($trim.StartsWith("{") -or $trim.StartsWith("[")) {
+    return $trim | ConvertFrom-Json
+  }
+  if (-not $trim.StartsWith("<")) {
+    throw "Device returned an unexpected reply: $($trim.Substring(0, [Math]::Min(180, $trim.Length)))"
   }
 
-  $reader = New-Object IO.StreamReader($response.GetResponseStream())
-  $text = $reader.ReadToEnd()
-  $reader.Close()
-  $response.Close()
+  [xml]$xml = $trim
+  $status = $xml.SelectSingleNode("//*[local-name()='statusString']")
+  $infos = @($xml.SelectNodes("//*[local-name()='Info']"))
+  if ($status -and $infos.Count -eq 0) {
+    $detail = Get-XmlText $xml.DocumentElement "subStatusCode"
+    throw "Device refused the request: $($status.InnerText) $detail"
+  }
+
+  $rows = @()
+  foreach ($node in $infos) {
+    $rows += [pscustomobject]@{
+      employeeNoString = Get-XmlText $node "employeeNoString"
+      employeeNo = Get-XmlText $node "employeeNo"
+      time = Get-XmlText $node "time"
+      minor = Get-XmlText $node "minor"
+    }
+  }
+  return [pscustomobject]@{
+    AcsEvent = [pscustomobject]@{
+      InfoList = $rows
+      responseStatusStrg = Get-XmlText $xml.DocumentElement "responseStatusStrg"
+    }
+  }
+}
+
+function Invoke-DeviceRequest {
+  param([string]$Url, [string]$Body)
+
+  $bodyFile = Join-Path $env:TEMP "hik-bridge-body.json"
+  $outFile = Join-Path $env:TEMP "hik-bridge-out.txt"
+  Set-Content -Path $bodyFile -Value $Body -Encoding ASCII
+
+  $code = & curl.exe --digest -sS -u "${DeviceUser}:${DevicePassword}" -H "Content-Type: application/json" -H "Accept: application/json" --data-binary "@$bodyFile" -o $outFile -w "%{http_code}" $Url
+  $text = ""
+  if (Test-Path $outFile) { $text = Get-Content -Path $outFile -Raw }
+  if ($code -ne "200") {
+    throw "Device returned HTTP $code. $text"
+  }
   return $text
 }
 
@@ -57,7 +81,9 @@ function Get-PakistanNow {
 $sent = @{}
 if (Test-Path $StatePath) {
   $saved = Get-Content $StatePath -Raw | ConvertFrom-Json
-  foreach ($key in @($saved.sent)) { $sent[$key] = $true }
+  foreach ($key in @($saved.sent)) {
+    if ($key) { $sent[$key] = $true }
+  }
 }
 
 $now = Get-PakistanNow
@@ -81,8 +107,8 @@ do {
     }
   } | ConvertTo-Json -Compress
 
-  $raw = Invoke-DeviceJson -Url $deviceBase -Body $query
-  $parsed = $raw | ConvertFrom-Json
+  $raw = Invoke-DeviceRequest -Url $deviceBase -Body $query
+  $parsed = Convert-AcsResponse -Raw $raw
   if (-not $parsed.AcsEvent.InfoList) { break }
   $info = @($parsed.AcsEvent.InfoList)
 

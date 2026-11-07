@@ -67,7 +67,7 @@ function formatShiftTime(shift: string): string {
   return formatTo12Hour(shift.trim());
 }
 
-type AttendanceStatus = "On Time" | "Late" | "Absent";
+type AttendanceStatus = "On Time" | "Late" | "Absent" | "Holiday";
 
 interface EmployeeRecord {
   id: string;
@@ -119,6 +119,7 @@ interface DaySheetResponse {
   logs?: AttendanceLog[];
   monthlyRecords?: MonthlyRecord[];
   companySettings?: CompanySettings;
+  holiday?: { title: string; startDate: string; endDate: string } | null;
 }
 
 export default function AdminAttendancePage() {
@@ -205,11 +206,11 @@ export default function AdminAttendancePage() {
         rawCheckOut: log?.checkOut || null,
         workingHours: log?.workingHours || 0,
         formattedDuration: log?.formattedDuration || "",
-        status: (log?.status || "Absent") as "On Time" | "Late" | "Absent",
+        status: (log?.status || (daySheet?.holiday ? "Holiday" : "Absent")) as AttendanceStatus,
         isLocked,
       };
     });
-  }, [employees, attendanceLogs, monthlyRecords, shiftTimeLabel]);
+  }, [employees, attendanceLogs, monthlyRecords, shiftTimeLabel, daySheet?.holiday]);
 
   const metrics = useMemo(() => {
     const presentCount = mergedRecords.filter((r) => r.status === "On Time" || r.status === "Late").length;
@@ -250,7 +251,7 @@ export default function AdminAttendancePage() {
       checkOut: formatToLocalTimeInput(record?.checkOut, defaultCheckOut),
       hasCheckOut: hasCheckOut,
       enableCheckOut: hasCheckOut, 
-      status: record?.status || "On Time",
+      status: record?.status && record.status !== "Holiday" ? record.status : "On Time",
       isLocked: !!targetRecord?.isLocked,
     });
     setIsEditModalOpen(true);
@@ -408,7 +409,7 @@ export default function AdminAttendancePage() {
                 )
               ),
             ]}
-            statuses={["All", "On Time", "Late", "Absent"]}
+            statuses={["All", "On Time", "Late", "Absent", "Holiday"]}
             onClear={() => {
               setSearchQuery("");
               setFilterDept("All");
@@ -467,6 +468,8 @@ export default function AdminAttendancePage() {
           userId={selectedUserId}
           date={filterDate}
           initialData={editForm}
+          shiftStart={companySettings?.shiftStart || "09:00"}
+          gracePeriod={companySettings?.gracePeriod ?? 15}
           onSave={handleSaveAttendance}
         />
       )}

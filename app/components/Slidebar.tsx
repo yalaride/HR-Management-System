@@ -117,6 +117,11 @@ const navItems = {
       icon: <CalendarClock className="w-5 h-5 shrink-0" />, // Date + time attendance logs
     },
     {
+      href: "/admin/holidays",
+      label: "Holidays",
+      icon: <CalendarOff className="w-5 h-5 shrink-0" />,
+    },
+    {
       href: "/admin/birthdays",
       label: "Birthdays",
       icon: <Cake className="w-5 h-5 shrink-0" />,
