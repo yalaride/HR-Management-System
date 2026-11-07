@@ -10,6 +10,8 @@ import { MonthlyAttendance } from "@/modals/MonthlyAttendance";
 import { ActivityLog } from "@/modals/ActivityLog";
 import CompanyDetails from "@/modals/CompanyDetails";
 import { Holiday } from "@/modals/Holiday";
+import Leave from "@/modals/LeaveRequest";
+import { buildAttendanceReport } from "@/lib/attendance-report";
 
 const TIMEZONE = "Asia/Karachi";
 
@@ -55,26 +57,6 @@ function timeToMinutes(timeStr: string): number {
   return (h || 0) * 60 + (m || 0);
 }
 
-/** A Karachi calendar day plus a clock time, stored as UTC. Pakistan is UTC+5. */
-function karachiWallTime(dateStr: string, hhmm: string): Date {
-  const [year, month, day] = dateStr.split("-").map((part) => parseInt(part, 10));
-  const [hour, minute] = hhmm.split(":").map((part) => parseInt(part, 10) || 0);
-  return new Date(Date.UTC(year, month - 1, day, hour - 5, minute, 0, 0));
-}
-
-/** A punch after shift end is recorded as the shift-end time. */
-function clampCheckOutToShiftEnd(
-  dateStr: string,
-  checkOut: Date,
-  settings: AttendanceSettings
-): Date {
-  const shiftStart = settings.shiftStart || "09:00";
-  const shiftEnd = settings.shiftEnd || "17:00";
-  if (timeToMinutes(shiftEnd) < timeToMinutes(shiftStart)) return checkOut;
-  const shiftEndAt = karachiWallTime(dateStr, shiftEnd);
-  return checkOut.getTime() > shiftEndAt.getTime() ? shiftEndAt : checkOut;
-}
-
 /** Fetches active settings or defaults */
 export async function getActiveSettings() {
   let settings = await CompanyDetails.findOne();
@@ -118,22 +100,10 @@ function computeDailyShiftsAndHours(
     return { status, workingHours: 0, formattedDuration: "" };
   }
 
-  const shiftEndMin = timeToMinutes(shiftEnd);
-  const checkOutMinutes = getKarachiMinutes(checkOutDate);
-
-  let diffMinutes = 0;
-  const isNightShift = shiftEndMin < shiftStartMin;
-
-  if (!isNightShift) {
-    const effectiveStartMinutes = Math.max(checkInMinutes, shiftStartMin);
-    const effectiveEndMinutes = Math.min(checkOutMinutes, shiftEndMin);
-    diffMinutes = Math.max(0, effectiveEndMinutes - effectiveStartMinutes);
-  } else {
-    const diffMs = checkOutDate.getTime() - checkInDate.getTime();
-    diffMinutes = Math.max(0, Math.floor(diffMs / (1000 * 60)));
-  }
-
-  // Cap working hours to 8 hours maximum per day
+  // Credit the real time between check-in and check-out, up to 8 hours.
+  // A late arrival that still completes 8 hours has no hour shortfall.
+  void shiftEnd;
+  let diffMinutes = Math.max(0, Math.floor((checkOutDate.getTime() - checkInDate.getTime()) / 60000));
   if (diffMinutes > 8 * 60) {
     diffMinutes = 8 * 60;
   }
@@ -296,7 +266,6 @@ export async function getUserAttendanceHistory(userId: string, period: string | 
   const onTimeDays = logs.filter((l) => l.status === "On Time").length;
   const lateDays = logs.filter((l) => l.status === "Late").length;
   const absentDays = logs.filter((l) => l.status === "Absent").length;
-  const totalHours = logs.reduce((sum, l) => sum + (l.workingHours || 0), 0);
 
   const presenceCount = onTimeDays + lateDays;
   const attendanceRate = totalDays > 0 ? Math.round((presenceCount / totalDays) * 100) : 0;
@@ -321,15 +290,78 @@ export async function getUserAttendanceHistory(userId: string, period: string | 
     isLocked = lockObj ? lockObj.isLocked : false;
   }
 
+  const monthStr = String(currentMonth).padStart(2, "0");
+  let rangeFrom = `${currentYear}-${monthStr}-01`;
+  let rangeTo = todayStr;
+  if (period === "last-month") {
+    const lastMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+    const lastYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+    const lastMonthStr = String(lastMonth).padStart(2, "0");
+    const lastDay = new Date(Date.UTC(lastYear, lastMonth, 0)).getUTCDate();
+    rangeFrom = `${lastYear}-${lastMonthStr}-01`;
+    rangeTo = `${lastYear}-${lastMonthStr}-${String(lastDay).padStart(2, "0")}`;
+  } else if (period === "all") {
+    rangeFrom = `${currentYear}-01-01`;
+  }
+
+  const employee = await Employee.findOne({ userId })
+    .select("name designation department joinDate")
+    .lean<{ name?: string; designation?: string; department?: string; joinDate?: Date | null } | null>();
+  const joinDate = employee?.joinDate ? getKarachiDateString(new Date(employee.joinDate)) : "";
+  if (joinDate && joinDate > rangeFrom) rangeFrom = joinDate;
+  if (rangeFrom > rangeTo) rangeFrom = rangeTo;
+
+  const [holidays, leaves] = await Promise.all([
+    Holiday.find({ startDate: { $lte: rangeTo }, endDate: { $gte: rangeFrom } })
+      .select("title startDate endDate")
+      .lean<{ title: string; startDate: string; endDate: string }[]>(),
+    Leave.find({
+      userId,
+      status: "APPROVED",
+      startDate: { $lte: new Date(`${rangeTo}T23:59:59+05:00`) },
+      endDate: { $gte: new Date(`${rangeFrom}T00:00:00+05:00`) },
+    })
+      .select("type status startDate endDate")
+      .lean<{ type: string; status: string; startDate: Date; endDate: Date }[]>(),
+  ]);
+
+  const settingsForReport = await getActiveSettings();
+  const report = buildAttendanceReport({
+    from: rangeFrom,
+    to: rangeTo,
+    today: todayStr,
+    shiftStart: settingsForReport.shiftStart || "09:00",
+    gracePeriod: typeof settingsForReport.gracePeriod === "number" ? settingsForReport.gracePeriod : 15,
+    punches: logs.map((log) => ({
+      date: log.date,
+      checkIn: log.checkIn,
+      checkOut: log.checkOut,
+      status: log.status,
+    })),
+    leaves: leaves.map((leave) => ({
+      type: leave.type,
+      status: leave.status,
+      startDate: getKarachiDateString(new Date(leave.startDate)),
+      endDate: getKarachiDateString(new Date(leave.endDate)),
+    })),
+    holidays,
+  });
+
   return {
     logs,
     isLocked,
+    report,
+    employee: {
+      name: employee?.name || "",
+      designation: employee?.designation || "",
+      department: employee?.department || "",
+    },
     stats: {
       totalDays,
       onTimeDays,
       lateDays,
-      absentDays,
-      totalHours: Number(totalHours.toFixed(2)),
+      absentDays: report.summary.absentDays,
+      totalHours: report.summary.totalHours,
       attendanceRate,
     },
   };
@@ -379,10 +411,7 @@ export async function upsertAttendanceRecord(
 
   const settings = await getActiveSettings();
   const checkInDate = checkIn ? new Date(checkIn) : null;
-  let checkOutDate = checkOut ? new Date(checkOut) : null;
-  if (checkInDate && checkOutDate) {
-    checkOutDate = clampCheckOutToShiftEnd(date, checkOutDate, settings);
-  }
+  const checkOutDate = checkOut ? new Date(checkOut) : null;
 
   const calculations = computeDailyShiftsAndHours(checkInDate, checkOutDate, settings);
   // Arrival status follows the saved check-in time. A corrected time clears an old Late flag.
@@ -474,11 +503,7 @@ export async function recordDevicePunch(input: {
   const earliest = new Date(Math.min(...stamps));
   const latest = new Date(Math.max(...stamps));
   const checkIn = earliest;
-  let checkOut = latest.getTime() - earliest.getTime() >= DUPLICATE_PUNCH_MS ? latest : null;
-  if (checkOut) {
-    checkOut = clampCheckOutToShiftEnd(date, checkOut, settings);
-    if (checkOut.getTime() - checkIn.getTime() < DUPLICATE_PUNCH_MS) checkOut = null;
-  }
+  const checkOut = latest.getTime() - earliest.getTime() >= DUPLICATE_PUNCH_MS ? latest : null;
 
   const previousCheckIn = existing?.checkIn ? new Date(existing.checkIn).getTime() : null;
   const previousCheckOut = existing?.checkOut ? new Date(existing.checkOut).getTime() : null;

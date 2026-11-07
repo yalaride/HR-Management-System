@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
-import { TrendingUp, BarChart3, ChevronDown, Lock, Edit2 } from "lucide-react";
+import { TrendingUp, ChevronDown, Lock, Edit2 } from "lucide-react";
 import RetroLogModal from "./RetroLogModal";
+import { downloadAttendanceReport } from "./attendanceReportPdf";
+import type { AttendanceReport } from "@/lib/attendance-report";
 
 function karachiMonthLabel(offsetMonths: number): string {
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -97,6 +99,8 @@ export default function HistoryAnalytics({
   onPeriodChange,
 }: HistoryProps) {
   const [logs, setLogs] = useState<AttendanceLog[]>([]);
+  const [report, setReport] = useState<AttendanceReport | null>(null);
+  const [employeeProfile, setEmployeeProfile] = useState({ name: "", designation: "", department: "" });
   const [isLocked, setIsLocked] = useState<boolean>(false);
   const [stats, setStats] = useState<HistoryStats>({
     totalDays: 0,
@@ -154,6 +158,8 @@ export default function HistoryAnalytics({
         if (res.ok && isMounted) {
           const data = await res.json();
           setLogs(data.logs || []);
+          setReport(data.report || null);
+          setEmployeeProfile(data.employee || { name: "", designation: "", department: "" });
           setStats(data.stats || {});
           setIsLocked(!!data.isLocked);
         }
@@ -360,22 +366,25 @@ export default function HistoryAnalytics({
 
               <div className="grid grid-cols-2 gap-2 border-t border-slate-100 pt-4 text-center">
                 <div className="bg-slate-50 p-2 border border-slate-100 rounded-xl">
-                  <div className="text-[9px] font-extrabold text-emerald-800 uppercase">On Time</div>
-                  <div className="text-base font-black text-emerald-600 mt-0.5">{stats.onTimeDays || 0}</div>
+                  <div className="text-[9px] font-extrabold text-emerald-800 uppercase">Attended</div>
+                  <div className="text-base font-black text-emerald-600 mt-0.5">{report?.summary.attendedHours ?? stats.totalHours ?? 0} hrs</div>
                 </div>
                 <div className="bg-slate-50 p-2 border border-slate-100 rounded-xl">
-                  <div className="text-[9px] font-extrabold text-amber-800 uppercase">Late Arrivals</div>
-                  <div className="text-base font-black text-amber-600 mt-0.5">{stats.lateDays || 0}</div>
+                  <div className="text-[9px] font-extrabold text-sky-800 uppercase">Paid hours</div>
+                  <div className="text-base font-black text-sky-600 mt-0.5">{report?.summary.paidHours ?? 0} hrs</div>
                 </div>
                 <div className="bg-slate-50 p-2 border border-slate-100 rounded-xl">
-                  <div className="text-[9px] font-extrabold text-rose-800 uppercase">Absent</div>
-                  <div className="text-base font-black text-rose-600 mt-0.5">{stats.absentDays || 0}</div>
+                  <div className="text-[9px] font-extrabold text-rose-800 uppercase">Short</div>
+                  <div className="text-base font-black text-rose-600 mt-0.5">{report?.summary.shortHours ?? 0} hrs</div>
                 </div>
                 <div className="bg-slate-50 p-2 border border-slate-100 rounded-xl">
-                  <div className="text-[9px] font-extrabold text-indigo-800 uppercase">Total Hours</div>
-                  <div className="text-base font-black text-indigo-600 mt-0.5">{stats.totalHours || 0}</div>
+                  <div className="text-[9px] font-extrabold text-indigo-800 uppercase">Total payable</div>
+                  <div className="text-base font-black text-indigo-600 mt-0.5">{report?.summary.totalHours ?? stats.totalHours ?? 0} hrs</div>
                 </div>
               </div>
+              <p className="text-[10px] text-content-secondary leading-relaxed">
+                Monday to Saturday. A full day is 8 hours. Late is only the arrival flag. Paid leave and company holidays add 8 paid hours with no shortfall.
+              </p>
             </>
           )}
         </div>
@@ -384,11 +393,32 @@ export default function HistoryAnalytics({
       {/* RIGHT COLUMN: DETAIL WORKLOG LIST */}
       <div className="xl:col-span-8">
         <div className="bg-white border border-line-subtle rounded-2xl shadow-xs overflow-hidden">
-          <div className="px-6 py-4 border-b border-line-subtle bg-slate-50/60 flex items-center justify-between">
+          <div className="px-6 py-4 border-b border-line-subtle bg-slate-50/60 flex items-center justify-between gap-3">
             <span className="text-[10px] font-extrabold uppercase tracking-widest text-content-muted">
               Historical Worklogs Ledger
             </span>
-            <BarChart3 className="w-4 h-4 text-slate-400" />
+            <button
+              type="button"
+              disabled={!report || report.days.length === 0}
+              onClick={() => {
+                if (!report) return;
+                void downloadAttendanceReport({
+                  employeeName: employeeProfile.name || selectedEmp?.name || "Employee",
+                  designation: employeeProfile.designation || selectedEmp?.designation || "",
+                  department: employeeProfile.department || selectedEmp?.department || "",
+                  periodLabel:
+                    period === "last-month"
+                      ? `Last Month (${karachiMonthLabel(-1)})`
+                      : period === "all"
+                        ? "This Year"
+                        : `This Month (${karachiMonthLabel(0)})`,
+                  report,
+                });
+              }}
+              className="rounded-lg bg-brand-accent px-3 py-1.5 text-[10px] font-bold text-white disabled:opacity-50"
+            >
+              Download PDF
+            </button>
           </div>
 
           <div className="overflow-x-auto">
@@ -398,8 +428,9 @@ export default function HistoryAnalytics({
                   <th className="px-6 py-4">Punch Date</th>
                   <th className="px-6 py-4">Check-In</th>
                   <th className="px-6 py-4">Check-Out</th>
-                  <th className="px-6 py-4">Decimal Hours</th>
-                  <th className="px-6 py-4">Duration</th>
+                  <th className="px-6 py-4">Worked</th>
+                  <th className="px-6 py-4">Short</th>
+                  <th className="px-6 py-4">Paid</th>
                   <th className="px-6 py-4 text-center">Status</th>
                   {!isLocked && <th className="px-6 py-4 text-right">Actions</th>}
                 </tr>
@@ -407,48 +438,50 @@ export default function HistoryAnalytics({
               <tbody className="divide-y divide-slate-100 text-xs">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={isLocked ? 6 : 7} className="px-6 py-12 text-center text-content-secondary animate-pulse">
+                    <td colSpan={isLocked ? 7 : 8} className="px-6 py-12 text-center text-content-secondary animate-pulse">
                       Retrieving partitioned logs database...
                     </td>
                   </tr>
-                ) : logs.length === 0 ? (
+                ) : (report?.days.length || 0) === 0 ? (
                   <tr>
-                    <td colSpan={isLocked ? 6 : 7} className="px-6 py-12 text-center text-content-secondary">
+                    <td colSpan={isLocked ? 7 : 8} className="px-6 py-12 text-center text-content-secondary">
                       No matching historical logs found for the selected date range.
                     </td>
                   </tr>
                 ) : (
-                  logs.map((log) => {
+                  report?.days.map((row) => {
+                    const log = logs.find((item) => item.date === row.date);
                     let badgeStyle = "bg-slate-50 text-slate-700 border-slate-200";
-                    if (log.status === "On Time") badgeStyle = "bg-emerald-50 text-emerald-700 border-emerald-100";
-                    if (log.status === "Late") badgeStyle = "bg-amber-50 text-amber-700 border-amber-100";
-                    if (log.status === "Absent") badgeStyle = "bg-rose-50 text-rose-700 border-rose-100";
+                    if (row.arrival === "On Time") badgeStyle = "bg-emerald-50 text-emerald-700 border-emerald-100";
+                    if (row.arrival === "Late") badgeStyle = "bg-amber-50 text-amber-700 border-amber-100";
+                    if (row.arrival === "Absent" || row.arrival === "Unpaid leave") badgeStyle = "bg-rose-50 text-rose-700 border-rose-100";
+                    if (row.arrival === "Holiday" || row.arrival === "Paid leave") badgeStyle = "bg-sky-50 text-sky-700 border-sky-100";
 
                     return (
-                      <tr key={log._id} className="hover:bg-slate-50/50 transition">
-                        <td className="px-6 py-4 font-black text-content-main">{log.date}</td>
-                        <td className="px-6 py-4 font-mono font-semibold">
-                          {log.checkIn ? formatTo12Hour(new Date(log.checkIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: "Asia/Karachi" })) : "--"}
-                        </td>
-                        <td className="px-6 py-4 font-mono font-semibold">
-                          {log.checkOut ? formatTo12Hour(new Date(log.checkOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: "Asia/Karachi" })) : "--"}
-                        </td>
-                        <td className="px-6 py-4 font-mono font-bold text-slate-500">{log.workingHours || "0"} hrs</td>
-                        <td className="px-6 py-4 font-mono font-extrabold text-content-main">{log.formattedDuration || "--"}</td>
+                      <tr key={row.date} className="hover:bg-slate-50/50 transition">
+                        <td className="px-6 py-4 font-black text-content-main">{row.date}</td>
+                        <td className="px-6 py-4 font-mono font-semibold">{row.checkIn}</td>
+                        <td className="px-6 py-4 font-mono font-semibold">{row.checkOut}</td>
+                        <td className="px-6 py-4 font-mono font-bold text-slate-500">{row.worked}</td>
+                        <td className="px-6 py-4 font-mono font-extrabold text-rose-600">{row.short}</td>
+                        <td className="px-6 py-4 font-mono font-bold text-sky-700">{row.paid}</td>
                         <td className="px-6 py-4 text-center">
                           <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide uppercase border ${badgeStyle}`}>
-                            {log.status}
+                            {row.arrival}
                           </span>
+                          <div className="mt-1 text-[10px] text-content-secondary">{row.detail}</div>
                         </td>
                         {!isLocked && (
                           <td className="px-6 py-4 text-right">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEditModal(log)}
-                              className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg cursor-pointer inline-flex items-center justify-center"
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
+                            {log ? (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditModal(log)}
+                                className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg cursor-pointer inline-flex items-center justify-center"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                            ) : null}
                           </td>
                         )}
                       </tr>
