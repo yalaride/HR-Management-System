@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
-import { canManuallyEditAttendance } from "@/lib/audit-log-access";
+import { canDeleteAttendance, canManuallyEditAttendance } from "@/lib/audit-log-access";
 import {
   deleteAttendanceHistory,
   getDayAttendanceSheet,
@@ -69,18 +69,17 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const user = await getSessionUser();
-    if (!canManuallyEditAttendance(user)) {
+    if (!canDeleteAttendance(user)) {
       return NextResponse.json({ error: "Forbidden: You cannot delete attendance." }, { status: 403 });
     }
 
     const body = await request.json().catch(() => ({}));
-    const period = body.period === "this-month" || body.period === "last-month" || body.period === "all"
-      ? body.period
-      : undefined;
+    if (typeof body.date !== "string" || !body.date) {
+      return NextResponse.json({ error: "Choose one attendance day to delete." }, { status: 400 });
+    }
     const result = await deleteAttendanceHistory({
       userId: body.userId,
-      date: typeof body.date === "string" ? body.date : undefined,
-      period,
+      date: body.date,
     });
 
     if (!result.ok) {

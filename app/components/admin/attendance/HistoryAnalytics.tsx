@@ -65,6 +65,7 @@ interface HistoryProps {
   onPeriodChange: (p: "this-month" | "last-month" | "all") => void;
   shiftStart?: string;
   shiftEnd?: string;
+  canDelete?: boolean;
 }
 
 /** Converts "HH:MM" 24-hour time string to 12-hour AM/PM format */
@@ -102,6 +103,7 @@ export default function HistoryAnalytics({
   onPeriodChange,
   shiftStart = "12:00",
   shiftEnd = "20:00",
+  canDelete = false,
 }: HistoryProps) {
   const [logs, setLogs] = useState<AttendanceLog[]>([]);
   const [report, setReport] = useState<AttendanceReport | null>(null);
@@ -220,15 +222,8 @@ export default function HistoryAnalytics({
     setRefreshCounter((prev) => prev + 1);
   };
 
-  const periodText =
-    period === "last-month"
-      ? `Last Month (${karachiMonthLabel(-1)})`
-      : period === "all"
-        ? "all saved records"
-        : `This Month (${karachiMonthLabel(0)})`;
-
   const deleteAttendance = async (
-    body: { userId: string; date?: string; period?: HistoryProps["period"] },
+    body: { userId: string; date: string },
     confirm: { title: string; html: string },
     key: string
   ) => {
@@ -464,26 +459,6 @@ export default function HistoryAnalytics({
               Historical Worklogs Ledger
             </span>
             <div className="flex items-center gap-2">
-              {selectedEmployeeId && (
-                <button
-                  type="button"
-                  disabled={deletingKey !== null}
-                  onClick={() =>
-                    void deleteAttendance(
-                      { userId: selectedEmployeeId, period },
-                      {
-                        title: "Delete attendance history?",
-                        html: `Attendance days for <b>${employeeName}</b> in <b>${periodText}</b> will be removed, including absent days with no fingerprint. Holidays and leave stay. This cannot be undone.`,
-                      },
-                      `period:${period}`
-                    )
-                  }
-                  className="flex items-center gap-1.5 rounded-lg bg-rose-600 px-3 py-1.5 text-[10px] font-bold text-white hover:bg-rose-500 disabled:opacity-50"
-                >
-                  <Trash2 className="w-3 h-3" />
-                  Delete History
-                </button>
-              )}
             <button
               type="button"
               disabled={!report || report.days.length === 0}
@@ -570,23 +545,25 @@ export default function HistoryAnalytics({
                                 <Edit2 className="w-3.5 h-3.5" />
                               </button>
                             ) : null}
-                            <button
-                              type="button"
-                              disabled={deletingKey !== null}
-                              onClick={() =>
-                                void deleteAttendance(
-                                  { userId: selectedEmployeeId, date: row.date },
-                                  {
-                                    title: "Delete this day?",
-                                    html: `<b>${row.date}</b> will be removed from <b>${employeeName}</b>'s attendance history and will not count as short hours. This cannot be undone.`,
-                                  },
-                                  row.date
-                                )
-                              }
-                              className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg cursor-pointer inline-flex items-center justify-center disabled:opacity-50"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                            {canDelete ? (
+                              <button
+                                type="button"
+                                disabled={deletingKey !== null}
+                                onClick={() =>
+                                  void deleteAttendance(
+                                    { userId: selectedEmployeeId, date: row.date },
+                                    {
+                                      title: "Delete this day?",
+                                      html: `<b>${row.date}</b> will be removed from <b>${employeeName}</b>'s attendance history and will not count as short hours. This cannot be undone.`,
+                                    },
+                                    row.date
+                                  )
+                                }
+                                className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg cursor-pointer inline-flex items-center justify-center disabled:opacity-50"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            ) : null}
                           </div>
                         </td>
                       </tr>

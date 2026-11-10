@@ -10,6 +10,7 @@ import AttendanceFilters from "@/app/components/admin/attendance/AttendanceFilte
 import AttendanceTable from "@/app/components/admin/attendance/AttendanceTable";
 import HistoryAnalytics from "@/app/components/admin/attendance/HistoryAnalytics";
 import AttendanceSettings from "@/app/components/admin/settings/AttendanceSettings";
+import { canDeleteAttendance } from "@/lib/audit-log-access";
 
 // Modal Forms Imports
 import ManualAttendanceModal from "@/app/components/admin/attendance/ManualAttendanceModal";
@@ -143,6 +144,7 @@ export default function AdminAttendancePage() {
 
   const { data: session } = useSession();
   const canEditShiftRules = session?.user?.role === "admin";
+  const canDeleteRows = canDeleteAttendance(session?.user);
 
   const [isSyncing, setIsSyncing] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -451,6 +453,7 @@ export default function AdminAttendancePage() {
           onPeriodChange={setDrillPeriod}
           shiftStart={companySettings?.shiftStart || "12:00"}
           shiftEnd={companySettings?.shiftEnd || "20:00"}
+          canDelete={canDeleteRows}
         />
       )}
 

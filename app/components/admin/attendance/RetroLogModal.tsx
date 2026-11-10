@@ -48,7 +48,12 @@ export default function RetroLogModal({
     setFormError(null);
   }, [isOpen, initialData]);
 
-  const todayStr = new Date().toLocaleString("en-US", { timeZone: "Asia/Karachi" }).slice(0, 10);
+  const todayStr = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Karachi",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
 
   if (!isOpen) return null;
 
