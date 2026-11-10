@@ -362,6 +362,12 @@ export default function Sidebar({ role }: SidebarProps) {
     icon: <CalendarClock className="w-5 h-5 shrink-0" />,
   };
 
+  const headLeavesNavItem = {
+    href: "/employee/head-leaves",
+    label: "Head Leaves",
+    icon: <UserCheck className="w-5 h-5 shrink-0" />,
+  };
+
   let activeNavItems = [...navItems[displayRole]];
   if (displayRole === "employee" && isDepartmentHead) {
     activeNavItems = [...activeNavItems, ...departmentHeadNavItems];
@@ -372,11 +378,12 @@ export default function Sidebar({ role }: SidebarProps) {
       activeNavItems = [
         ...activeNavItems.slice(0, profileIdx),
         attendanceDeskNavItem,
+        headLeavesNavItem,
         auditLogNavItem,
         ...activeNavItems.slice(profileIdx),
       ];
     } else {
-      activeNavItems = [...activeNavItems, attendanceDeskNavItem, auditLogNavItem];
+      activeNavItems = [...activeNavItems, attendanceDeskNavItem, headLeavesNavItem, auditLogNavItem];
     }
   }
 

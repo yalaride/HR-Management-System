@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
 import Leave from "@/modals/LeaveRequest";
+import { DepartmentHead } from "@/modals/DepartmentHead";
 import { getDepartmentHeadContext, getDepartmentMemberUserIds } from "@/lib/department-head";
 import { listFormattedLeaves, decideLeaveRequest } from "@/lib/leave-service";
+
+async function departmentHeadUserIds(): Promise<Set<string>> {
+  const heads = await DepartmentHead.find().select("userId").lean<{ userId?: { toString(): string } }[]>();
+  return new Set(heads.map((head) => (head.userId ? String(head.userId) : "")).filter(Boolean));
+}
 
 export const dynamic = "force-dynamic";
 
@@ -18,8 +24,11 @@ export async function GET() {
       );
     }
 
-    const memberIds = await getDepartmentMemberUserIds(ctx.department, ctx.user.id);
-    const leaves = await listFormattedLeaves(memberIds);
+    const [memberIds, headIds] = await Promise.all([
+      getDepartmentMemberUserIds(ctx.department, ctx.user.id),
+      departmentHeadUserIds(),
+    ]);
+    const leaves = await listFormattedLeaves(memberIds.filter((id) => !headIds.has(id)));
 
     return NextResponse.json({ department: ctx.department, leaves });
   } catch (error) {
@@ -55,9 +64,10 @@ export async function PUT(req: Request) {
     }
 
     const leaveUserId = String(leave.userId || "");
-    if (leaveUserId === ctx.user.id) {
+    const headIds = await departmentHeadUserIds();
+    if (leaveUserId === ctx.user.id || headIds.has(leaveUserId)) {
       return NextResponse.json(
-        { error: "You cannot decide your own leave request." },
+        { error: "A department head's leave can only be accepted or rejected by admin or Ubaid." },
         { status: 403 }
       );
     }

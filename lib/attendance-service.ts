@@ -433,37 +433,33 @@ export async function upsertAttendanceRecord(
   const settings = await getActiveSettings();
   const checkInDate = checkIn ? new Date(checkIn) : null;
   const checkOutDate = checkOut ? new Date(checkOut) : null;
+  const finalStatus = status === "Absent" || !checkInDate ? "Absent" : null;
+
+  if (finalStatus === "Absent") {
+    await Attendance.deleteOne({ userId, date });
+    await AttendanceOmission.deleteOne({ userId, date });
+    await syncMonthlyAttendanceAggregates(userId, year, month);
+    return { ok: true, record: null };
+  }
 
   const calculations = computeDailyShiftsAndHours(checkInDate, checkOutDate, settings);
   // Arrival status follows the saved check-in time. A corrected time clears an old Late flag.
-  const finalStatus = status === "Absent" || !checkInDate ? "Absent" : calculations.status;
+  const savedStatus = calculations.status;
 
   const updatePayload: Record<string, unknown> = {
     userId,
     date,
-    status: finalStatus,
+    status: savedStatus,
+    checkIn: checkInDate,
   };
+  const updateQuery: Record<string, unknown> = { $set: updatePayload };
 
-  const updateQuery: Record<string, unknown> = {};
-
-  if (finalStatus === "Absent") {
-    updatePayload.workingHours = 0;
-    updatePayload.formattedDuration = "";
-    updateQuery.$set = updatePayload;
-    updateQuery.$unset = { checkIn: "", checkOut: "" };
+  if (checkOutDate) {
+    updatePayload.checkOut = checkOutDate;
+    updatePayload.workingHours = calculations.workingHours;
+    updatePayload.formattedDuration = calculations.formattedDuration;
   } else {
-    if (checkInDate) {
-      updatePayload.checkIn = checkInDate;
-    }
-    if (checkInDate && checkOutDate) {
-      updatePayload.checkOut = checkOutDate;
-      updatePayload.workingHours = calculations.workingHours;
-      updatePayload.formattedDuration = calculations.formattedDuration;
-      updateQuery.$set = updatePayload;
-    } else {
-      updateQuery.$set = updatePayload;
-      updateQuery.$unset = { checkOut: "", workingHours: "", formattedDuration: "" };
-    }
+    updateQuery.$unset = { checkOut: "", workingHours: "", formattedDuration: "" };
   }
 
   const updatedRecord = await Attendance.findOneAndUpdate({ userId, date }, updateQuery, {
