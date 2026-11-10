@@ -3,8 +3,10 @@
 import React, { useMemo, useState } from "react";
 import useSWR from "swr";
 import Swal from "sweetalert2";
-import { Loader2, ShieldAlert, CheckCircle2, XCircle, CalendarDays } from "lucide-react";
+import { Loader2, ShieldAlert, CheckCircle2, XCircle, CalendarDays, Trash2 } from "lucide-react";
+import { useSession } from "next-auth/react";
 import { ApiError } from "@/lib/api-client";
+import { canDeleteAttendance } from "@/lib/audit-log-access";
 
 interface HeadLeave {
   id: string;
@@ -36,8 +38,10 @@ const statusBadge: Record<string, string> = {
 };
 
 export default function HeadLeavesPage() {
+  const { data: session } = useSession();
+  const canDelete = session?.user?.role === "admin" || canDeleteAttendance(session?.user);
   const [actioningId, setActioningId] = useState<string | null>(null);
-  const [filter, setFilter] = useState<"All" | "Pending" | "Approved" | "Rejected">("Pending");
+  const [filter, setFilter] = useState<"All" | "Pending" | "Approved" | "Rejected">("All");
 
   const { data, error, isLoading, mutate } = useSWR<{ leaves?: HeadLeave[] }>("/api/employee/head-leaves");
   const forbidden = error instanceof ApiError && error.status === 403;
@@ -74,6 +78,37 @@ export default function HeadLeavesPage() {
         icon: "error",
         title: "Action failed",
         text: err instanceof Error ? err.message : "Could not update leave request.",
+        confirmButtonColor: "#2563eb",
+      });
+    } finally {
+      setActioningId(null);
+    }
+  };
+
+  const handleDelete = async (leave: HeadLeave) => {
+    const confirm = await Swal.fire({
+      title: "Delete this leave?",
+      html: `<b>${leave.employeeName}</b> — ${leave.type}, ${leave.days} day(s)<br/>The balance is restored when this leave had used it.`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Delete",
+      cancelButtonText: "Cancel",
+      confirmButtonColor: "#e11d48",
+    });
+    if (!confirm.isConfirmed) return;
+
+    try {
+      setActioningId(leave.id);
+      const res = await fetch(`/api/employee/head-leaves?id=${leave.id}`, { method: "DELETE" });
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) throw new Error(body.error || "Failed to delete leave.");
+      await mutate();
+      Toast.fire({ icon: "success", title: "Leave deleted" });
+    } catch (err) {
+      Swal.fire({
+        icon: "error",
+        title: "Delete failed",
+        text: err instanceof Error ? err.message : "Could not delete leave request.",
         confirmButtonColor: "#2563eb",
       });
     } finally {
@@ -209,6 +244,22 @@ export default function HeadLeavesPage() {
                             >
                               <XCircle className="w-3.5 h-3.5" />
                               Reject
+                            </button>
+                          </div>
+                        ) : canDelete ? (
+                          <div className="flex justify-end">
+                            <button
+                              type="button"
+                              disabled={actioningId === leave.id}
+                              onClick={() => void handleDelete(leave)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 disabled:opacity-50 text-rose-600 font-bold rounded-lg cursor-pointer"
+                            >
+                              {actioningId === leave.id ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Trash2 className="w-3.5 h-3.5" />
+                              )}
+                              Delete
                             </button>
                           </div>
                         ) : (

@@ -4,20 +4,21 @@ import Leave from "@/modals/LeaveRequest";
 import { DepartmentHead } from "@/modals/DepartmentHead";
 import { getSessionUser } from "@/lib/auth";
 import { canViewFullAuditLogs } from "@/lib/audit-log-access";
-import { listFormattedLeaves, decideLeaveRequest } from "@/lib/leave-service";
+import { listFormattedLeaves, decideLeaveRequest, deleteLeaveRequest } from "@/lib/leave-service";
 
 export const dynamic = "force-dynamic";
 
-async function requireAnonymous() {
+async function requireReviewer() {
   const user = await getSessionUser();
-  if (!user || user.role === "admin" || !canViewFullAuditLogs(user.email)) return null;
-  return user;
+  if (!user) return null;
+  if (user.role === "admin" || canViewFullAuditLogs(user.email)) return user;
+  return null;
 }
 
-/** Department head leaves. Admin decides them from the admin leaves page. */
+/** Department head leaves. Admin and the restricted reviewer can open this list. */
 export async function GET() {
   try {
-    const user = await requireAnonymous();
+    const user = await requireReviewer();
     if (!user) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
@@ -45,7 +46,7 @@ export async function GET() {
 
 export async function PUT(request: Request) {
   try {
-    const user = await requireAnonymous();
+    const user = await requireReviewer();
     if (!user) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
@@ -81,5 +82,46 @@ export async function PUT(request: Request) {
   } catch (error) {
     console.error("PUT head-leaves error:", error);
     return NextResponse.json({ error: "Failed to update leave request status." }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const user = await requireReviewer();
+    if (!user) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id") || "";
+    if (!id) {
+      return NextResponse.json({ error: "Missing leave id." }, { status: 400 });
+    }
+
+    await dbConnect();
+    const leave = await Leave.findById(id).select("userId status").lean<{ userId?: string; status?: string } | null>();
+    if (!leave) {
+      return NextResponse.json({ error: "Leave request not found." }, { status: 404 });
+    }
+
+    const status = String(leave.status || "").toUpperCase();
+    if (status !== "APPROVED" && status !== "REJECTED") {
+      return NextResponse.json({ error: "Only an accepted or rejected leave can be deleted." }, { status: 400 });
+    }
+
+    const isDepartmentHead = await DepartmentHead.exists({ userId: leave.userId });
+    if (!isDepartmentHead) {
+      return NextResponse.json({ error: "Only a department head's leave can be deleted here." }, { status: 403 });
+    }
+
+    const result = await deleteLeaveRequest(id);
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: result.status });
+    }
+
+    return NextResponse.json({ id: result.id, refundedDays: result.refundedDays });
+  } catch (error) {
+    console.error("DELETE head-leaves error:", error);
+    return NextResponse.json({ error: "Failed to delete leave request." }, { status: 500 });
   }
 }

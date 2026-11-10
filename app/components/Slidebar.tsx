@@ -102,6 +102,11 @@ const navItems = {
       icon: <CalendarCheck className="w-5 h-5 shrink-0" />, // Calendar approval / management
     },
     {
+      href: "/admin/head-leaves",
+      label: "Head Leaves",
+      icon: <UserCheck className="w-5 h-5 shrink-0" />,
+    },
+    {
       href: "/admin/leaves-policy",
       label: "Leaves Policy",
       icon: <BookOpenCheck className="w-5 h-5 shrink-0" />, // Policy guidelines & rule checks
