@@ -5,13 +5,14 @@
  */
 import dbConnect from "@/lib/mongodb";
 import { Attendance } from "@/modals/Attendance";
+import { AttendanceOmission } from "@/modals/AttendanceOmission";
 import { Employee } from "@/modals/Employee";
 import { MonthlyAttendance } from "@/modals/MonthlyAttendance";
 import { ActivityLog } from "@/modals/ActivityLog";
 import CompanyDetails from "@/modals/CompanyDetails";
 import { Holiday } from "@/modals/Holiday";
 import Leave from "@/modals/LeaveRequest";
-import { buildAttendanceReport, isFutureFingerprint, isShiftStartMarker } from "@/lib/attendance-report";
+import { buildAttendanceReport, eachDate, isFutureFingerprint, isShiftStartMarker } from "@/lib/attendance-report";
 
 const TIMEZONE = "Asia/Karachi";
 
@@ -313,7 +314,7 @@ export async function getUserAttendanceHistory(userId: string, period: string | 
   if (joinDate && joinDate > rangeFrom) rangeFrom = joinDate;
   if (rangeFrom > rangeTo) rangeFrom = rangeTo;
 
-  const [holidays, leaves] = await Promise.all([
+  const [holidays, leaves, omissions] = await Promise.all([
     Holiday.find({ startDate: { $lte: rangeTo }, endDate: { $gte: rangeFrom } })
       .select("title startDate endDate")
       .lean<{ title: string; startDate: string; endDate: string }[]>(),
@@ -325,6 +326,9 @@ export async function getUserAttendanceHistory(userId: string, period: string | 
     })
       .select("type status startDate endDate")
       .lean<{ type: string; status: string; startDate: Date; endDate: Date }[]>(),
+    AttendanceOmission.find({ userId, date: { $gte: rangeFrom, $lte: rangeTo } })
+      .select("date")
+      .lean<{ date: string }[]>(),
   ]);
 
   const settingsForReport = await getActiveSettings();
@@ -349,6 +353,7 @@ export async function getUserAttendanceHistory(userId: string, period: string | 
       endDate: getKarachiDateString(new Date(leave.endDate)),
     })),
     holidays,
+    omittedDates: omissions.map((item) => item.date),
   });
 
   return {
@@ -455,6 +460,7 @@ export async function upsertAttendanceRecord(
     runValidators: true,
   }).lean();
 
+  await AttendanceOmission.deleteOne({ userId, date });
   await syncMonthlyAttendanceAggregates(userId, year, month);
 
   return { ok: true, record: updatedRecord };
@@ -480,7 +486,51 @@ function attendanceHistoryRange(period: "this-month" | "last-month" | "all"): { 
   return {};
 }
 
-/** Removes saved check-in/check-out rows. One date, or every saved row in the selected history period. */
+function isSunday(iso: string): boolean {
+  const [year, month, day] = iso.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day)).getUTCDay() === 0;
+}
+
+/** Working days in the history window, excluding Sundays, holidays, and approved leave. */
+async function historyDaysToRemove(userId: string, from: string, to: string): Promise<string[]> {
+  const today = getKarachiDateString();
+  const end = to < today ? to : today;
+  const employee = await Employee.findOne({ userId })
+    .select("joinDate")
+    .lean<{ joinDate?: Date | null } | null>();
+  let start = from;
+  if (employee?.joinDate) {
+    const join = getKarachiDateString(new Date(employee.joinDate));
+    if (join > start) start = join;
+  }
+  if (start > end) return [];
+
+  const [holidays, leaves] = await Promise.all([
+    Holiday.find({ startDate: { $lte: end }, endDate: { $gte: start } })
+      .select("startDate endDate")
+      .lean<{ startDate: string; endDate: string }[]>(),
+    Leave.find({
+      userId,
+      status: "APPROVED",
+      startDate: { $lte: new Date(`${end}T23:59:59+05:00`) },
+      endDate: { $gte: new Date(`${start}T00:00:00+05:00`) },
+    })
+      .select("startDate endDate")
+      .lean<{ startDate: Date; endDate: Date }[]>(),
+  ]);
+
+  return eachDate(start, end).filter((date) => {
+    if (isSunday(date)) return false;
+    if (holidays.some((holiday) => holiday.startDate <= date && holiday.endDate >= date)) return false;
+    return !leaves.some((leave) => {
+      const leaveStart = getKarachiDateString(new Date(leave.startDate));
+      const leaveEnd = getKarachiDateString(new Date(leave.endDate));
+      return leaveStart <= date && leaveEnd >= date;
+    });
+  });
+}
+
+/** Removes a history day, including a calculated absent day that has no saved punch. */
 export async function deleteAttendanceHistory(input: {
   userId: string;
   date?: string;
@@ -499,76 +549,88 @@ export async function deleteAttendanceHistory(input: {
     return { ok: false, status: 400, error: "Invalid attendance date." };
   }
 
-  const query: Record<string, unknown> = { userId };
+  const today = getKarachiDateString();
+  let dates: string[] = [];
   if (input.date) {
-    query.date = input.date;
-  } else if (input.period && input.period !== "all") {
-    const range = attendanceHistoryRange(input.period);
-    query.date = { $gte: range.from, $lte: range.to };
+    if (input.date > today) {
+      return { ok: false, status: 400, error: "A future day cannot be deleted." };
+    }
+    dates = [input.date];
+  } else if (input.period) {
+    const range =
+      input.period === "all"
+        ? { from: `${today.slice(0, 4)}-01-01`, to: today }
+        : attendanceHistoryRange(input.period);
+    dates = await historyDaysToRemove(userId, range.from || `${today.slice(0, 4)}-01-01`, range.to || today);
   }
 
-  const logs = await Attendance.find(query).select("date").lean<{ _id: unknown; date: string }[]>();
-  if (!logs.length) {
-    return { ok: false, status: 404, error: "No saved attendance to delete." };
+  if (!dates.length) {
+    return { ok: false, status: 404, error: "No attendance days to delete." };
   }
 
-  const monthKeys = new Set<string>();
-  for (const log of logs) {
-    const [year, month] = log.date.split("-").map((part) => parseInt(part, 10));
-    if (year && month) monthKeys.add(`${year}|${month}`);
-  }
-
-  const lockDocs = await MonthlyAttendance.find({
-    userId,
-    $or: [...monthKeys].map((key) => {
-      const [year, month] = key.split("|").map(Number);
-      return { year, month };
-    }),
-  })
-    .select("year month isLocked")
-    .lean<{ year: number; month: number; isLocked: boolean }[]>();
-
-  const lockedMonths = new Set(
-    lockDocs.filter((lock) => lock.isLocked).map((lock) => `${lock.year}|${lock.month}`)
+  await AttendanceOmission.bulkWrite(
+    dates.map((date) => ({
+      updateOne: {
+        filter: { userId, date },
+        update: { $setOnInsert: { userId, date } },
+        upsert: true,
+      },
+    }))
   );
-  const deletable = logs.filter((log) => {
-    const [year, month] = log.date.split("-").map((part) => parseInt(part, 10));
-    return !lockedMonths.has(`${year}|${month}`);
-  });
 
-  if (!deletable.length) {
-    return { ok: false, status: 400, error: "This month's attendance logs are finalized and locked." };
+  const removedLogs = await Attendance.find({ userId, date: { $in: dates } }).select("date").lean<{ date: string }[]>();
+  if (removedLogs.length) {
+    await Attendance.deleteMany({ userId, date: { $in: dates } });
+    const months = new Set<string>();
+    for (const log of removedLogs) {
+      const [year, month] = log.date.split("-").map((part) => parseInt(part, 10));
+      if (year && month) months.add(`${year}|${month}`);
+    }
+    for (const key of months) {
+      const [year, month] = key.split("|").map(Number);
+      await syncMonthlyAttendanceAggregates(userId, year, month);
+    }
   }
 
-  await Attendance.deleteMany({ _id: { $in: deletable.map((log) => log._id) } });
-
-  const touchedMonths = new Set<string>();
-  for (const log of deletable) {
-    const [year, month] = log.date.split("-").map((part) => parseInt(part, 10));
-    if (year && month) touchedMonths.add(`${year}|${month}`);
-  }
-  for (const key of touchedMonths) {
-    const [year, month] = key.split("|").map(Number);
-    await syncMonthlyAttendanceAggregates(userId, year, month);
-  }
-
-  const description =
-    deletable.length === 1
-      ? `Attendance for ${deletable[0].date} was deleted`
-      : `${deletable.length} attendance records were deleted`;
   await ActivityLog.create({
     userId,
     activityType: "ATTENDANCE_DELETED",
-    date: input.date || deletable[0].date,
+    date: dates[0],
     timestamp: new Date(),
-    description,
+    description:
+      dates.length === 1
+        ? `Attendance history for ${dates[0]} was deleted`
+        : `${dates.length} attendance history days were deleted`,
   });
 
-  return {
-    ok: true,
-    deleted: deletable.length,
-    skippedLocked: logs.length - deletable.length,
-  };
+  return { ok: true, deleted: dates.length, skippedLocked: 0 };
+}
+
+/** One-time cleanup: drop every saved punch dated before the cutoff. Later days stay so they can be set by hand. */
+export async function deleteAttendanceBefore(cutoff: string): Promise<DeleteAttendanceResult> {
+  await dbConnect();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(cutoff)) {
+    return { ok: false, status: 400, error: "Invalid cutoff date." };
+  }
+
+  const logs = await Attendance.find({ date: { $lt: cutoff } })
+    .select("userId date")
+    .lean<{ userId: string; date: string }[]>();
+  const months = new Set<string>();
+  for (const log of logs) {
+    const [year, month] = log.date.split("-").map((part) => parseInt(part, 10));
+    if (log.userId && year && month) months.add(`${log.userId}|${year}|${month}`);
+  }
+
+  const removed = await Attendance.deleteMany({ date: { $lt: cutoff } });
+  await AttendanceOmission.deleteMany({ date: { $lt: cutoff } });
+
+  for (const key of months) {
+    const [userId, year, month] = key.split("|");
+    await syncMonthlyAttendanceAggregates(userId, Number(year), Number(month));
+  }
+
+  return { ok: true, deleted: removed.deletedCount || 0, skippedLocked: 0 };
 }
 
 const DUPLICATE_PUNCH_MS = 45_000;
@@ -744,6 +806,7 @@ export async function recordDevicePunch(input: {
     runValidators: true,
   });
 
+  await AttendanceOmission.deleteOne({ userId, date });
   await syncMonthlyAttendanceAggregates(userId, year, month);
 
   if (updatedRecord && action !== "duplicate") {

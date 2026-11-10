@@ -63,6 +63,7 @@ interface HistoryProps {
   onEmployeeChange: (id: string) => void;
   period: "this-month" | "last-month" | "all";
   onPeriodChange: (p: "this-month" | "last-month" | "all") => void;
+  reloadKey?: number;
 }
 
 /** Converts "HH:MM" 24-hour time string to 12-hour AM/PM format */
@@ -98,6 +99,7 @@ export default function HistoryAnalytics({
   onEmployeeChange,
   period,
   onPeriodChange,
+  reloadKey = 0,
 }: HistoryProps) {
   const [logs, setLogs] = useState<AttendanceLog[]>([]);
   const [report, setReport] = useState<AttendanceReport | null>(null);
@@ -179,7 +181,7 @@ export default function HistoryAnalytics({
     return () => {
       isMounted = false;
     };
-  }, [selectedEmployeeId, period, refreshCounter]);
+  }, [selectedEmployeeId, period, refreshCounter, reloadKey]);
 
   const handleOpenAddModal = () => {
     setEditingLogId(null);
@@ -473,7 +475,7 @@ export default function HistoryAnalytics({
               Historical Worklogs Ledger
             </span>
             <div className="flex items-center gap-2">
-              {selectedEmployeeId && !isLocked && (
+              {selectedEmployeeId && (
                 <button
                   type="button"
                   disabled={deletingKey !== null}
@@ -482,7 +484,7 @@ export default function HistoryAnalytics({
                       { userId: selectedEmployeeId, period },
                       {
                         title: "Delete attendance history?",
-                        html: `Saved check-in and check-out records for <b>${employeeName}</b> in <b>${periodText}</b> will be removed. Holidays and leave stay. This cannot be undone.`,
+                        html: `Attendance days for <b>${employeeName}</b> in <b>${periodText}</b> will be removed, including absent days with no fingerprint. Holidays and leave stay. This cannot be undone.`,
                       },
                       `period:${period}`
                     )
@@ -529,19 +531,19 @@ export default function HistoryAnalytics({
                   <th className="px-6 py-4">Short</th>
                   <th className="px-6 py-4">Paid</th>
                   <th className="px-6 py-4 text-center">Status</th>
-                  {!isLocked && <th className="px-6 py-4 text-right">Actions</th>}
+                  <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={isLocked ? 7 : 8} className="px-6 py-12 text-center text-content-secondary animate-pulse">
+                    <td colSpan={8} className="px-6 py-12 text-center text-content-secondary animate-pulse">
                       Retrieving partitioned logs database...
                     </td>
                   </tr>
                 ) : (report?.days.length || 0) === 0 ? (
                   <tr>
-                    <td colSpan={isLocked ? 7 : 8} className="px-6 py-12 text-center text-content-secondary">
+                    <td colSpan={8} className="px-6 py-12 text-center text-content-secondary">
                       No matching historical logs found for the selected date range.
                     </td>
                   </tr>
@@ -568,38 +570,36 @@ export default function HistoryAnalytics({
                           </span>
                           <div className="mt-1 text-[10px] text-content-secondary">{row.detail}</div>
                         </td>
-                        {!isLocked && (
-                          <td className="px-6 py-4 text-right">
-                            {log ? (
-                              <div className="inline-flex items-center justify-end gap-1">
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenEditModal(log)}
-                                  className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg cursor-pointer inline-flex items-center justify-center"
-                                >
-                                  <Edit2 className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={deletingKey !== null}
-                                  onClick={() =>
-                                    void deleteAttendance(
-                                      { userId: selectedEmployeeId, date: log.date },
-                                      {
-                                        title: "Delete this day?",
-                                        html: `The saved attendance for <b>${employeeName}</b> on <b>${log.date}</b> will be removed. This cannot be undone.`,
-                                      },
-                                      log.date
-                                    )
-                                  }
-                                  className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg cursor-pointer inline-flex items-center justify-center disabled:opacity-50"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
+                        <td className="px-6 py-4 text-right">
+                          <div className="inline-flex items-center justify-end gap-1">
+                            {log && !isLocked ? (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditModal(log)}
+                                className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg cursor-pointer inline-flex items-center justify-center"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
                             ) : null}
-                          </td>
-                        )}
+                            <button
+                              type="button"
+                              disabled={deletingKey !== null}
+                              onClick={() =>
+                                void deleteAttendance(
+                                  { userId: selectedEmployeeId, date: row.date },
+                                  {
+                                    title: "Delete this day?",
+                                    html: `<b>${row.date}</b> will be removed from <b>${employeeName}</b>'s attendance history and will not count as short hours. This cannot be undone.`,
+                                  },
+                                  row.date
+                                )
+                              }
+                              className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg cursor-pointer inline-flex items-center justify-center disabled:opacity-50"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     );
                   })

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { canManuallyEditAttendance } from "@/lib/audit-log-access";
 import {
+  deleteAttendanceBefore,
   deleteAttendanceHistory,
   getDayAttendanceSheet,
   getUserAttendanceHistory,
@@ -74,6 +75,14 @@ export async function DELETE(request: Request) {
     }
 
     const body = await request.json().catch(() => ({}));
+    if (body.before === "2026-11-07") {
+      const cleared = await deleteAttendanceBefore("2026-11-07");
+      if (!cleared.ok) {
+        return NextResponse.json({ error: cleared.error }, { status: cleared.status });
+      }
+      return NextResponse.json({ success: true, deleted: cleared.deleted, skippedLocked: 0 }, { status: 200 });
+    }
+
     const period = body.period === "this-month" || body.period === "last-month" || body.period === "all"
       ? body.period
       : undefined;

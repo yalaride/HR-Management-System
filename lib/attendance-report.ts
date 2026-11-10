@@ -168,7 +168,9 @@ export function buildAttendanceReport(input: {
   punches: ReportPunch[];
   leaves: ReportLeave[];
   holidays: ReportHoliday[];
+  omittedDates?: string[];
 }): AttendanceReport {
+  const omitted = new Set(input.omittedDates || []);
   const punchByDate = new Map(input.punches.map((punch) => [punch.date, punch]));
   const [startHour, startMinute] = input.shiftStart.split(":").map((part) => Number(part) || 0);
   const graceLimit = startHour * 60 + startMinute + input.gracePeriod;
@@ -183,7 +185,7 @@ export function buildAttendanceReport(input: {
   let holidayDays = 0;
 
   for (const date of eachDate(input.from, input.to)) {
-    if (weekdayIndex(date) === 0) continue;
+    if (weekdayIndex(date) === 0 || omitted.has(date)) continue;
     const weekday = WEEKDAYS[weekdayIndex(date)];
     const holiday = input.holidays.find((item) => item.startDate <= date && item.endDate >= date);
     const leave = input.leaves.find((item) => leaveCovers(item, date));
