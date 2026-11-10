@@ -3,8 +3,7 @@
 import React, { useState, useMemo } from "react";
 import useSWR from "swr";
 import { useSession } from "next-auth/react";
-import { Plus, RefreshCw, AlertCircle, Trash2 } from "lucide-react";
-import Swal from "sweetalert2";
+import { Plus, RefreshCw, AlertCircle } from "lucide-react";
 
 import AttendanceSummaryCards from "@/app/components/admin/attendance/AttendanceSummaryCards";
 import AttendanceFilters from "@/app/components/admin/attendance/AttendanceFilters";
@@ -146,8 +145,6 @@ export default function AdminAttendancePage() {
   const canEditShiftRules = session?.user?.role === "admin";
 
   const [isSyncing, setIsSyncing] = useState(false);
-  const [clearingBefore, setClearingBefore] = useState(false);
-  const [historyReload, setHistoryReload] = useState(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const [editForm, setEditForm] = useState({
@@ -162,52 +159,6 @@ export default function AdminAttendancePage() {
   const triggerToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
-  };
-
-  const handleDeleteBeforeNovember = async () => {
-    const result = await Swal.fire({
-      title: "Delete attendance before 7 Nov?",
-      html: "Every saved check-in and check-out dated before <b>7 November 2026</b> will be removed for all employees. 1–6 November stay on the report so you can set them. Do not press this after those days are entered.",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonText: "Yes, delete",
-      cancelButtonText: "Cancel",
-      reverseButtons: true,
-      buttonsStyling: false,
-      customClass: {
-        popup: "bg-white border border-line-subtle rounded-2xl shadow-xl p-6 font-sans text-center",
-        title: "text-base font-bold text-content-main",
-        htmlContainer: "text-xs text-content-secondary mt-2 leading-relaxed",
-        actions: "flex gap-2 justify-center mt-5 w-full",
-        confirmButton:
-          "px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-xl transition shadow-sm cursor-pointer",
-        cancelButton:
-          "px-4 py-2.5 bg-surface-main hover:bg-line-subtle text-content-secondary text-xs font-semibold rounded-xl transition cursor-pointer",
-      },
-    });
-    if (!result.isConfirmed) return;
-
-    setClearingBefore(true);
-    try {
-      const res = await fetch("/api/admin/employee-attendance", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ before: "2026-11-07" }),
-      });
-      const payload = (await res.json().catch(() => ({}))) as { error?: string; deleted?: number };
-      if (!res.ok) throw new Error(payload.error || "Could not delete attendance.");
-      await refreshDaySheet();
-      setHistoryReload((value) => value + 1);
-      triggerToast(
-        payload.deleted
-          ? `Deleted ${payload.deleted} attendance records from before 7 November.`
-          : "No attendance records from before 7 November were left."
-      );
-    } catch (err) {
-      triggerToast(err instanceof Error ? err.message : "Could not delete attendance.");
-    } finally {
-      setClearingBefore(false);
-    }
   };
 
   // Day sheet is cached + revalidated in the background — instant on revisit
@@ -387,16 +338,6 @@ export default function AdminAttendancePage() {
 
         <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
           <button
-            type="button"
-            onClick={() => void handleDeleteBeforeNovember()}
-            disabled={clearingBefore}
-            className="inline-flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-rose-500 disabled:opacity-50 cursor-pointer sm:w-auto"
-          >
-            <Trash2 className="h-3.5 w-3.5 shrink-0" />
-            <span>{clearingBefore ? "Deleting..." : "Delete before 7 Nov"}</span>
-          </button>
-
-          <button
             onClick={handleRefreshAttendance}
             disabled={isSyncing}
             className="inline-flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-line-subtle bg-slate-100 px-4 py-2.5 text-xs font-bold text-content-main transition hover:bg-slate-200 disabled:opacity-50 cursor-pointer sm:w-auto"
@@ -508,7 +449,6 @@ export default function AdminAttendancePage() {
           onEmployeeChange={setDrillEmployeeId}
           period={drillPeriod}
           onPeriodChange={setDrillPeriod}
-          reloadKey={historyReload}
         />
       )}
 

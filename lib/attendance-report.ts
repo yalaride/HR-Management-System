@@ -190,6 +190,7 @@ export function buildAttendanceReport(input: {
     const holiday = input.holidays.find((item) => item.startDate <= date && item.endDate >= date);
     const leave = input.leaves.find((item) => leaveCovers(item, date));
     const punch = punchByDate.get(date);
+    if (date.startsWith("2026-10") && !punch?.checkIn && !punch?.checkOut) continue;
 
     if (holiday) {
       holidayDays += 1;

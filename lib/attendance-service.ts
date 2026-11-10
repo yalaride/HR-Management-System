@@ -606,33 +606,6 @@ export async function deleteAttendanceHistory(input: {
   return { ok: true, deleted: dates.length, skippedLocked: 0 };
 }
 
-/** One-time cleanup: drop every saved punch dated before the cutoff. Later days stay so they can be set by hand. */
-export async function deleteAttendanceBefore(cutoff: string): Promise<DeleteAttendanceResult> {
-  await dbConnect();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(cutoff)) {
-    return { ok: false, status: 400, error: "Invalid cutoff date." };
-  }
-
-  const logs = await Attendance.find({ date: { $lt: cutoff } })
-    .select("userId date")
-    .lean<{ userId: string; date: string }[]>();
-  const months = new Set<string>();
-  for (const log of logs) {
-    const [year, month] = log.date.split("-").map((part) => parseInt(part, 10));
-    if (log.userId && year && month) months.add(`${log.userId}|${year}|${month}`);
-  }
-
-  const removed = await Attendance.deleteMany({ date: { $lt: cutoff } });
-  await AttendanceOmission.deleteMany({ date: { $lt: cutoff } });
-
-  for (const key of months) {
-    const [userId, year, month] = key.split("|");
-    await syncMonthlyAttendanceAggregates(userId, Number(year), Number(month));
-  }
-
-  return { ok: true, deleted: removed.deletedCount || 0, skippedLocked: 0 };
-}
-
 const DUPLICATE_PUNCH_MS = 45_000;
 
 type PunchLog = {

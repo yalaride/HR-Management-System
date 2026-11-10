@@ -63,7 +63,6 @@ interface HistoryProps {
   onEmployeeChange: (id: string) => void;
   period: "this-month" | "last-month" | "all";
   onPeriodChange: (p: "this-month" | "last-month" | "all") => void;
-  reloadKey?: number;
 }
 
 /** Converts "HH:MM" 24-hour time string to 12-hour AM/PM format */
@@ -99,7 +98,6 @@ export default function HistoryAnalytics({
   onEmployeeChange,
   period,
   onPeriodChange,
-  reloadKey = 0,
 }: HistoryProps) {
   const [logs, setLogs] = useState<AttendanceLog[]>([]);
   const [report, setReport] = useState<AttendanceReport | null>(null);
@@ -181,7 +179,7 @@ export default function HistoryAnalytics({
     return () => {
       isMounted = false;
     };
-  }, [selectedEmployeeId, period, refreshCounter, reloadKey]);
+  }, [selectedEmployeeId, period, refreshCounter]);
 
   const handleOpenAddModal = () => {
     setEditingLogId(null);
