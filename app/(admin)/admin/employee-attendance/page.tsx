@@ -449,6 +449,8 @@ export default function AdminAttendancePage() {
           onEmployeeChange={setDrillEmployeeId}
           period={drillPeriod}
           onPeriodChange={setDrillPeriod}
+          shiftStart={companySettings?.shiftStart || "12:00"}
+          shiftEnd={companySettings?.shiftEnd || "20:00"}
         />
       )}
 

@@ -356,9 +356,21 @@ export async function getUserAttendanceHistory(userId: string, period: string | 
     omittedDates: omissions.map((item) => item.date),
   });
 
+  const lastMonthNumber = currentMonth === 1 ? 12 : currentMonth - 1;
+  const lastMonthYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+  const lastMonthKey = String(lastMonthNumber).padStart(2, "0");
+  const lastMonthRecords = await Attendance.countDocuments({
+    userId,
+    date: {
+      $gte: `${lastMonthYear}-${lastMonthKey}-01`,
+      $lte: `${lastMonthYear}-${lastMonthKey}-31`,
+    },
+  });
+
   return {
     logs: cleanedLogs,
     isLocked,
+    hasLastMonth: lastMonthRecords > 0,
     report,
     employee: {
       name: employee?.name || "",

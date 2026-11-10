@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { X, Calendar } from "lucide-react";
 
 interface RetroLogModalProps {
@@ -37,6 +37,17 @@ export default function RetroLogModal({
     status: initialData.status,
   });
 
+  useEffect(() => {
+    if (!isOpen) return;
+    setForm({
+      date: initialData.date,
+      checkIn: initialData.checkIn,
+      checkOut: initialData.checkOut,
+      status: initialData.status,
+    });
+    setFormError(null);
+  }, [isOpen, initialData]);
+
   const todayStr = new Date().toLocaleString("en-US", { timeZone: "Asia/Karachi" }).slice(0, 10);
 
   if (!isOpen) return null;
@@ -65,6 +76,7 @@ export default function RetroLogModal({
         checkOut: isAbsent ? null : `${form.date}T${form.checkOut}:00+05:00`,
         status: form.status,
       });
+      onClose();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed saving retro logs.";
       setFormError(errorMessage);

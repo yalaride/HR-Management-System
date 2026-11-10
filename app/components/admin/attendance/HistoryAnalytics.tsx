@@ -63,6 +63,8 @@ interface HistoryProps {
   onEmployeeChange: (id: string) => void;
   period: "this-month" | "last-month" | "all";
   onPeriodChange: (p: "this-month" | "last-month" | "all") => void;
+  shiftStart?: string;
+  shiftEnd?: string;
 }
 
 /** Converts "HH:MM" 24-hour time string to 12-hour AM/PM format */
@@ -98,6 +100,8 @@ export default function HistoryAnalytics({
   onEmployeeChange,
   period,
   onPeriodChange,
+  shiftStart = "12:00",
+  shiftEnd = "20:00",
 }: HistoryProps) {
   const [logs, setLogs] = useState<AttendanceLog[]>([]);
   const [report, setReport] = useState<AttendanceReport | null>(null);
@@ -112,6 +116,7 @@ export default function HistoryAnalytics({
     attendanceRate: 0,
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [hasLastMonth, setHasLastMonth] = useState(false);
   const [refreshCounter, setRefreshCounter] = useState(0);
   const [deletingKey, setDeletingKey] = useState<string | null>(null);
 
@@ -129,7 +134,6 @@ export default function HistoryAnalytics({
   const empRef = useRef<HTMLDivElement>(null);
 
   const selectedEmp = employees.find((e) => e.userId === selectedEmployeeId);
-  const todayStr = new Date().toLocaleString("en-US", { timeZone: "Asia/Karachi" }).slice(0, 10);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -160,6 +164,7 @@ export default function HistoryAnalytics({
         if (res.ok && isMounted) {
           const data = await res.json();
           setLogs(data.logs || []);
+          setHasLastMonth(Boolean(data.hasLastMonth));
           setReport(data.report || null);
           setEmployeeProfile(data.employee || { name: "", designation: "", department: "" });
           setStats(data.stats || {});
@@ -181,24 +186,17 @@ export default function HistoryAnalytics({
     };
   }, [selectedEmployeeId, period, refreshCounter]);
 
-  const handleOpenAddModal = () => {
-    setEditingLogId(null);
-    setDialogForm({
-      date: todayStr,
-      checkIn: "09:00",
-      checkOut: "17:00",
-      status: "On Time",
-    });
-    setIsModalOpen(true);
-  };
+  useEffect(() => {
+    if (!hasLastMonth && period === "last-month") onPeriodChange("this-month");
+  }, [hasLastMonth, period, onPeriodChange]);
 
-  const handleOpenEditModal = (log: AttendanceLog) => {
-    setEditingLogId(log._id);
+  const handleOpenEditModal = (date: string, log?: AttendanceLog) => {
+    setEditingLogId(log?._id || date);
     setDialogForm({
-      date: log.date,
-      checkIn: formatToLocalTimeInput(log.checkIn, "09:00"),
-      checkOut: formatToLocalTimeInput(log.checkOut, "17:00"),
-      status: log.status,
+      date,
+      checkIn: formatToLocalTimeInput(log?.checkIn, shiftStart),
+      checkOut: formatToLocalTimeInput(log?.checkOut, shiftEnd),
+      status: log?.status === "Late" ? "Late" : "On Time",
     });
     setIsModalOpen(true);
   };
@@ -307,15 +305,6 @@ export default function HistoryAnalytics({
                 Historical Lookup Parameters
               </span>
             </div>
-            {selectedEmployeeId && !isLocked && (
-              <button
-                type="button"
-                onClick={handleOpenAddModal}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-accent text-white hover:bg-brand-hover text-[10px] font-bold rounded-lg cursor-pointer transition shadow-xs"
-              >
-                <span>Add Record Row</span>
-              </button>
-            )}
           </div>
 
           {/* Select Target employee */}
@@ -366,16 +355,18 @@ export default function HistoryAnalytics({
           <div className="space-y-1.5">
             <label className="text-[10px] font-extrabold uppercase tracking-widest text-content-muted">Time Period</label>
             <div className="flex flex-col gap-2">
-              <button
-                onClick={() => onPeriodChange("last-month")}
-                className={`w-full py-2.5 text-xs font-bold rounded-xl border transition cursor-pointer ${
-                  period === "last-month"
-                    ? "bg-brand-subtle text-brand-accent border-brand-accent"
-                    : "bg-white text-content-secondary border-line-subtle hover:bg-slate-50"
-                }`}
-              >
-                Last Month ({karachiMonthLabel(-1)})
-              </button>
+              {hasLastMonth && (
+                <button
+                  onClick={() => onPeriodChange("last-month")}
+                  className={`w-full py-2.5 text-xs font-bold rounded-xl border transition cursor-pointer ${
+                    period === "last-month"
+                      ? "bg-brand-subtle text-brand-accent border-brand-accent"
+                      : "bg-white text-content-secondary border-line-subtle hover:bg-slate-50"
+                  }`}
+                >
+                  Last Month ({karachiMonthLabel(-1)})
+                </button>
+              )}
               <button
                 onClick={() => onPeriodChange("this-month")}
                 className={`w-full py-2.5 text-xs font-bold rounded-xl border transition cursor-pointer ${
@@ -570,10 +561,10 @@ export default function HistoryAnalytics({
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="inline-flex items-center justify-end gap-1">
-                            {log && !isLocked ? (
+                            {!isLocked && row.arrival !== "Holiday" && row.arrival !== "Paid leave" ? (
                               <button
                                 type="button"
-                                onClick={() => handleOpenEditModal(log)}
+                                onClick={() => handleOpenEditModal(row.date, log)}
                                 className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg cursor-pointer inline-flex items-center justify-center"
                               >
                                 <Edit2 className="w-3.5 h-3.5" />
