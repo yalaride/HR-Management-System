@@ -67,7 +67,7 @@ export async function PUT(req: Request) {
     const headIds = await departmentHeadUserIds();
     if (leaveUserId === ctx.user.id || headIds.has(leaveUserId)) {
       return NextResponse.json(
-        { error: "A department head's leave can only be accepted or rejected by admin or Ubaid." },
+        { error: "A department head's leave can only be accepted or rejected by Admin." },
         { status: 403 }
       );
     }

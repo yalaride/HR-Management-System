@@ -96,7 +96,7 @@ export default function HeadLeavesPage() {
         <ShieldAlert className="w-10 h-10 text-rose-500" />
         <h2 className="text-sm font-bold text-content-main">Not allowed</h2>
         <p className="text-xs text-content-secondary max-w-sm">
-          Department head leave requests are decided by Ubaid or an admin.
+          Department head leave requests are decided by Admin.
         </p>
       </div>
     );

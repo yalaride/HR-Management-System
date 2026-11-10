@@ -129,7 +129,7 @@ export default function TeamLeavesPage() {
               <h1 className="text-2xl font-black tracking-tight text-content-main">Team Leaves</h1>
             </div>
             <p className="mt-1 text-xs text-content-secondary">
-              Approve or reject leave requests from your <b>{department}</b> team. A department head&apos;s own leave is decided by admin or Ubaid.
+              Approve or reject leave requests from your <b>{department}</b> team. A department head&apos;s own leave is decided by Admin.
             </p>
           </div>
           {pendingCount > 0 && (

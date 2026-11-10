@@ -8,16 +8,16 @@ import { listFormattedLeaves, decideLeaveRequest } from "@/lib/leave-service";
 
 export const dynamic = "force-dynamic";
 
-async function requireUbaid() {
+async function requireAnonymous() {
   const user = await getSessionUser();
   if (!user || user.role === "admin" || !canViewFullAuditLogs(user.email)) return null;
   return user;
 }
 
-/** Leaves that belong to a department head. Only Ubaid decides these here; admin uses the admin leaves page. */
+/** Department head leaves. Admin decides them from the admin leaves page. */
 export async function GET() {
   try {
-    const user = await requireUbaid();
+    const user = await requireAnonymous();
     if (!user) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
@@ -45,7 +45,7 @@ export async function GET() {
 
 export async function PUT(request: Request) {
   try {
-    const user = await requireUbaid();
+    const user = await requireAnonymous();
     if (!user) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
@@ -72,7 +72,7 @@ export async function PUT(request: Request) {
       );
     }
 
-    const result = await decideLeaveRequest(id, action, `by ${user.name || "Ubaid"}`);
+    const result = await decideLeaveRequest(id, action, "by Admin");
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: result.status });
     }
