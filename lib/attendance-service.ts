@@ -11,7 +11,7 @@ import { ActivityLog } from "@/modals/ActivityLog";
 import CompanyDetails from "@/modals/CompanyDetails";
 import { Holiday } from "@/modals/Holiday";
 import Leave from "@/modals/LeaveRequest";
-import { buildAttendanceReport } from "@/lib/attendance-report";
+import { buildAttendanceReport, isFutureFingerprint, isShiftStartMarker } from "@/lib/attendance-report";
 
 const TIMEZONE = "Asia/Karachi";
 
@@ -226,9 +226,11 @@ export async function getDayAttendanceSheet(date: string, options: DaySheetOptio
     shiftTime: e?.shiftTime || shiftTimeLabel,
   }));
 
+  const cleanedLogs = await stripInvalidCheckouts(logs);
+
   return {
     employees: enrichedEmployees,
-    logs,
+    logs: cleanedLogs,
     monthlyRecords,
     shiftTimeLabel,
     companySettings: settings,
@@ -326,13 +328,15 @@ export async function getUserAttendanceHistory(userId: string, period: string | 
   ]);
 
   const settingsForReport = await getActiveSettings();
+  const cleanedLogs = await stripInvalidCheckouts(logs);
   const report = buildAttendanceReport({
     from: rangeFrom,
     to: rangeTo,
     today: todayStr,
     shiftStart: settingsForReport.shiftStart || "09:00",
+    shiftEnd: settingsForReport.shiftEnd || "17:00",
     gracePeriod: typeof settingsForReport.gracePeriod === "number" ? settingsForReport.gracePeriod : 15,
-    punches: logs.map((log) => ({
+    punches: cleanedLogs.map((log) => ({
       date: log.date,
       checkIn: log.checkIn,
       checkOut: log.checkOut,
@@ -348,7 +352,7 @@ export async function getUserAttendanceHistory(userId: string, period: string | 
   });
 
   return {
-    logs,
+    logs: cleanedLogs,
     isLocked,
     report,
     employee: {
@@ -456,7 +460,172 @@ export async function upsertAttendanceRecord(
   return { ok: true, record: updatedRecord };
 }
 
+export type DeleteAttendanceResult =
+  | { ok: true; deleted: number; skippedLocked: number }
+  | { ok: false; status: number; error: string };
+
+function attendanceHistoryRange(period: "this-month" | "last-month" | "all"): { from?: string; to?: string } {
+  const todayStr = getKarachiDateString();
+  const [currentYear, currentMonth] = todayStr.split("-").map((part) => parseInt(part, 10));
+  if (period === "this-month") {
+    const monthStr = String(currentMonth).padStart(2, "0");
+    return { from: `${currentYear}-${monthStr}-01`, to: `${currentYear}-${monthStr}-31` };
+  }
+  if (period === "last-month") {
+    const lastMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+    const lastYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+    const lastMonthStr = String(lastMonth).padStart(2, "0");
+    return { from: `${lastYear}-${lastMonthStr}-01`, to: `${lastYear}-${lastMonthStr}-31` };
+  }
+  return {};
+}
+
+/** Removes saved check-in/check-out rows. One date, or every saved row in the selected history period. */
+export async function deleteAttendanceHistory(input: {
+  userId: string;
+  date?: string;
+  period?: "this-month" | "last-month" | "all";
+}): Promise<DeleteAttendanceResult> {
+  await dbConnect();
+
+  const userId = input.userId?.trim();
+  if (!userId) {
+    return { ok: false, status: 400, error: "Select an employee first." };
+  }
+  if (!input.date && !input.period) {
+    return { ok: false, status: 400, error: "Choose a day or a history period to delete." };
+  }
+  if (input.date && !/^\d{4}-\d{2}-\d{2}$/.test(input.date)) {
+    return { ok: false, status: 400, error: "Invalid attendance date." };
+  }
+
+  const query: Record<string, unknown> = { userId };
+  if (input.date) {
+    query.date = input.date;
+  } else if (input.period && input.period !== "all") {
+    const range = attendanceHistoryRange(input.period);
+    query.date = { $gte: range.from, $lte: range.to };
+  }
+
+  const logs = await Attendance.find(query).select("date").lean<{ _id: unknown; date: string }[]>();
+  if (!logs.length) {
+    return { ok: false, status: 404, error: "No saved attendance to delete." };
+  }
+
+  const monthKeys = new Set<string>();
+  for (const log of logs) {
+    const [year, month] = log.date.split("-").map((part) => parseInt(part, 10));
+    if (year && month) monthKeys.add(`${year}|${month}`);
+  }
+
+  const lockDocs = await MonthlyAttendance.find({
+    userId,
+    $or: [...monthKeys].map((key) => {
+      const [year, month] = key.split("|").map(Number);
+      return { year, month };
+    }),
+  })
+    .select("year month isLocked")
+    .lean<{ year: number; month: number; isLocked: boolean }[]>();
+
+  const lockedMonths = new Set(
+    lockDocs.filter((lock) => lock.isLocked).map((lock) => `${lock.year}|${lock.month}`)
+  );
+  const deletable = logs.filter((log) => {
+    const [year, month] = log.date.split("-").map((part) => parseInt(part, 10));
+    return !lockedMonths.has(`${year}|${month}`);
+  });
+
+  if (!deletable.length) {
+    return { ok: false, status: 400, error: "This month's attendance logs are finalized and locked." };
+  }
+
+  await Attendance.deleteMany({ _id: { $in: deletable.map((log) => log._id) } });
+
+  const touchedMonths = new Set<string>();
+  for (const log of deletable) {
+    const [year, month] = log.date.split("-").map((part) => parseInt(part, 10));
+    if (year && month) touchedMonths.add(`${year}|${month}`);
+  }
+  for (const key of touchedMonths) {
+    const [year, month] = key.split("|").map(Number);
+    await syncMonthlyAttendanceAggregates(userId, year, month);
+  }
+
+  const description =
+    deletable.length === 1
+      ? `Attendance for ${deletable[0].date} was deleted`
+      : `${deletable.length} attendance records were deleted`;
+  await ActivityLog.create({
+    userId,
+    activityType: "ATTENDANCE_DELETED",
+    date: input.date || deletable[0].date,
+    timestamp: new Date(),
+    description,
+  });
+
+  return {
+    ok: true,
+    deleted: deletable.length,
+    skippedLocked: logs.length - deletable.length,
+  };
+}
+
 const DUPLICATE_PUNCH_MS = 45_000;
+
+type PunchLog = {
+  _id?: unknown;
+  userId?: unknown;
+  date?: string;
+  checkIn?: Date | null;
+  checkOut?: Date | null;
+  workingHours?: number;
+  formattedDuration?: string;
+};
+
+/** Drops a checkout that has not happened yet, or that is earlier than check-in. */
+async function stripInvalidCheckouts<T extends PunchLog>(logs: T[], now = new Date()): Promise<T[]> {
+  const repairs: Promise<unknown>[] = [];
+  const months = new Set<string>();
+
+  const cleaned = logs.map((log) => {
+    const checkIn = log.checkIn ? new Date(log.checkIn) : null;
+    const checkOut = log.checkOut ? new Date(log.checkOut) : null;
+    const checkInOk = Boolean(checkIn && !Number.isNaN(checkIn.getTime()));
+    const checkOutOk =
+      Boolean(checkOut) &&
+      checkInOk &&
+      !isFutureFingerprint(checkOut as Date, now) &&
+      (checkOut as Date).getTime() > (checkIn as Date).getTime();
+
+    if (!log.checkOut || checkOutOk) return log;
+
+    if (log._id) {
+      repairs.push(
+        Attendance.updateOne(
+          { _id: log._id },
+          { $unset: { checkOut: 1, workingHours: 1, formattedDuration: 1 } }
+        )
+      );
+      if (log.userId && log.date) {
+        const [year, month] = log.date.split("-").map((part) => parseInt(part, 10));
+        if (year && month) months.add(`${String(log.userId)}|${year}|${month}`);
+      }
+    }
+
+    return { ...log, checkOut: null, workingHours: 0, formattedDuration: "" };
+  });
+
+  if (repairs.length) {
+    await Promise.all(repairs);
+    for (const key of months) {
+      const [userId, year, month] = key.split("|");
+      await syncMonthlyAttendanceAggregates(userId, Number(year), Number(month));
+    }
+  }
+
+  return cleaned;
+}
 
 export type DevicePunchResult =
   | { ok: true; action: "check-in" | "check-out" | "duplicate"; status: string }
@@ -495,35 +664,68 @@ export async function recordDevicePunch(input: {
 
   const settings = await getActiveSettings();
   const existing = await Attendance.findOne({ userId, date });
+  const now = new Date();
+  const shiftStart = settings.shiftStart || "09:00";
 
-  const stamps = [existing?.checkIn, existing?.checkOut, punchedAt]
-    .map((value) => (value ? new Date(value) : null))
-    .filter((value): value is Date => value !== null && !Number.isNaN(value.getTime()))
+  const asDate = (value: Date | null | undefined) => {
+    if (!value) return null;
+    const instant = new Date(value);
+    return Number.isNaN(instant.getTime()) ? null : instant;
+  };
+
+  const storedCheckIn = asDate(existing?.checkIn);
+  const storedCheckOut = asDate(existing?.checkOut);
+  const usableCheckIn =
+    storedCheckIn && !isFutureFingerprint(storedCheckIn, now) ? storedCheckIn : null;
+  const storedCheckOutUsable =
+    storedCheckOut &&
+    usableCheckIn &&
+    !isFutureFingerprint(storedCheckOut, now) &&
+    storedCheckOut.getTime() > usableCheckIn.getTime()
+      ? storedCheckOut
+      : null;
+
+  const shiftStartMarker = isShiftStartMarker(punchedAt, now, shiftStart);
+  const incomingUsable =
+    !isFutureFingerprint(punchedAt, now) &&
+    !(shiftStartMarker && (!usableCheckIn || punchedAt.getTime() <= usableCheckIn.getTime()));
+
+  const stamps = [usableCheckIn, storedCheckOutUsable, incomingUsable ? punchedAt : null]
+    .filter((value): value is Date => value !== null)
     .map((value) => value.getTime());
-  const earliest = new Date(Math.min(...stamps));
-  const latest = new Date(Math.max(...stamps));
-  const checkIn = earliest;
-  const checkOut = latest.getTime() - earliest.getTime() >= DUPLICATE_PUNCH_MS ? latest : null;
 
-  const previousCheckIn = existing?.checkIn ? new Date(existing.checkIn).getTime() : null;
-  const previousCheckOut = existing?.checkOut ? new Date(existing.checkOut).getTime() : null;
-  const checkInChanged = previousCheckIn !== checkIn.getTime();
-  const checkOutChanged = (previousCheckOut ?? null) !== (checkOut ? checkOut.getTime() : null);
-  const action: "check-in" | "check-out" | "duplicate" = !checkInChanged && !checkOutChanged
-    ? "duplicate"
-    : checkOut && punchedAt.getTime() === checkOut.getTime() && punchedAt.getTime() !== checkIn.getTime()
-      ? "check-out"
-      : "check-in";
-
-  if (action === "duplicate" && existing) {
-    return { ok: true, action, status: existing.status };
+  if (!stamps.length) {
+    return { ok: true, action: "duplicate", status: existing?.status || "On Time" };
   }
 
-  const calculations = computeDailyShiftsAndHours(checkIn, checkOut, settings);
+  const earliest = new Date(Math.min(...stamps));
+  const latest = new Date(Math.max(...stamps));
+  const nextCheckIn = earliest;
+  const nextCheckOut =
+    latest.getTime() - earliest.getTime() >= DUPLICATE_PUNCH_MS ? latest : null;
+
+  const previousCheckIn = storedCheckIn ? storedCheckIn.getTime() : null;
+  const previousCheckOut = storedCheckOut ? storedCheckOut.getTime() : null;
+  const checkInChanged = previousCheckIn !== nextCheckIn.getTime();
+  const checkOutChanged = (previousCheckOut ?? null) !== (nextCheckOut ? nextCheckOut.getTime() : null);
+
+  if (!checkInChanged && !checkOutChanged) {
+    return { ok: true, action: "duplicate", status: existing?.status || "On Time" };
+  }
+
+  const checkOut = nextCheckOut;
+  const action: "check-in" | "check-out" | "duplicate" =
+    !incomingUsable
+      ? "duplicate"
+      : checkOut && punchedAt.getTime() === checkOut.getTime() && punchedAt.getTime() !== nextCheckIn.getTime()
+        ? "check-out"
+        : "check-in";
+
+  const calculations = computeDailyShiftsAndHours(nextCheckIn, checkOut, settings);
   const updatePayload: Record<string, unknown> = {
     userId,
     date,
-    checkIn,
+    checkIn: nextCheckIn,
     status: calculations.status,
   };
   const updateQuery: Record<string, unknown> = { $set: updatePayload };

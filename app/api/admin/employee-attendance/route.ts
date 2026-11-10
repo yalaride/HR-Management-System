@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { canManuallyEditAttendance } from "@/lib/audit-log-access";
 import {
+  deleteAttendanceHistory,
   getDayAttendanceSheet,
   getUserAttendanceHistory,
   upsertAttendanceRecord,
@@ -61,6 +62,37 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, record: result.record }, { status: 200 });
   } catch (error) {
     console.error("Attendance API POST Error:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const user = await getSessionUser();
+    if (!canManuallyEditAttendance(user)) {
+      return NextResponse.json({ error: "Forbidden: You cannot delete attendance." }, { status: 403 });
+    }
+
+    const body = await request.json().catch(() => ({}));
+    const period = body.period === "this-month" || body.period === "last-month" || body.period === "all"
+      ? body.period
+      : undefined;
+    const result = await deleteAttendanceHistory({
+      userId: body.userId,
+      date: typeof body.date === "string" ? body.date : undefined,
+      period,
+    });
+
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: result.status });
+    }
+
+    return NextResponse.json(
+      { success: true, deleted: result.deleted, skippedLocked: result.skippedLocked },
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error("Attendance API DELETE Error:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

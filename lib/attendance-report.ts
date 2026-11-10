@@ -55,6 +55,42 @@ function weekdayIndex(iso: string): number {
   return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
 }
 
+function karachiPart(date: Date, type: "hour" | "minute" | "second"): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Karachi",
+    hour: "numeric",
+    minute: "numeric",
+    second: "numeric",
+    hour12: false,
+  }).formatToParts(date);
+  return Number(parts.find((part) => part.type === type)?.value || 0) % (type === "hour" ? 24 : 60);
+}
+
+function clockMinutes(value: string): number {
+  const [hour, minute] = value.split(":").map((part) => Number(part) || 0);
+  return hour * 60 + minute;
+}
+
+/** A punch time that has not happened yet is not a fingerprint. */
+export function isFutureFingerprint(instant: Date, now: Date): boolean {
+  return Number.isNaN(instant.getTime()) || instant.getTime() > now.getTime() + 2 * 60 * 1000;
+}
+
+/**
+ * The device sometimes sends the shift start (for example 12:00:00) as its own event.
+ * A live tap at that minute is kept. The same time arriving much later is a schedule marker.
+ */
+export function isShiftStartMarker(instant: Date, now: Date, shiftStart: string): boolean {
+  if (Number.isNaN(instant.getTime())) return true;
+  const minutes = karachiPart(instant, "hour") * 60 + karachiPart(instant, "minute");
+  const seconds = karachiPart(instant, "second");
+  return (
+    seconds === 0 &&
+    minutes === clockMinutes(shiftStart) &&
+    Math.abs(now.getTime() - instant.getTime()) > 3 * 60 * 1000
+  );
+}
+
 function karachiMinutes(date: Date): number {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "Asia/Karachi",
@@ -126,7 +162,9 @@ export function buildAttendanceReport(input: {
   to: string;
   today: string;
   shiftStart: string;
+  shiftEnd?: string;
   gracePeriod: number;
+  now?: Date;
   punches: ReportPunch[];
   leaves: ReportLeave[];
   holidays: ReportHoliday[];
@@ -202,10 +240,20 @@ export function buildAttendanceReport(input: {
       continue;
     }
 
-    const checkIn = punch?.checkIn ? new Date(punch.checkIn) : null;
-    const checkOut = punch?.checkOut ? new Date(punch.checkOut) : null;
-    const hasCheckIn = checkIn && !Number.isNaN(checkIn.getTime());
-    const hasCheckOut = checkOut && !Number.isNaN(checkOut.getTime());
+    const now = input.now ?? new Date();
+    const checkInDate = punch?.checkIn ? new Date(punch.checkIn) : null;
+    const checkOutDate = punch?.checkOut ? new Date(punch.checkOut) : null;
+    const checkIn =
+      checkInDate && !isFutureFingerprint(checkInDate, now) ? checkInDate : null;
+    const checkOut =
+      checkOutDate &&
+      checkIn &&
+      !isFutureFingerprint(checkOutDate, now) &&
+      checkOutDate.getTime() > checkIn.getTime()
+        ? checkOutDate
+        : null;
+    const hasCheckIn = Boolean(checkIn);
+    const hasCheckOut = Boolean(checkOut);
 
     if (hasCheckIn && !hasCheckOut && date === input.today) {
       days.push({
@@ -238,6 +286,8 @@ export function buildAttendanceReport(input: {
       });
       continue;
     }
+
+    if (!checkIn || !checkOut) continue;
 
     const worked = Math.max(0, Math.floor((checkOut.getTime() - checkIn.getTime()) / 60000));
     const credited = Math.min(REQUIRED_DAY_MINUTES, worked);

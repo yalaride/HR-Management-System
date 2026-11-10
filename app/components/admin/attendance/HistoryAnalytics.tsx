@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
-import { TrendingUp, ChevronDown, Lock, Edit2 } from "lucide-react";
+import { TrendingUp, ChevronDown, Lock, Edit2, Trash2 } from "lucide-react";
+import Swal from "sweetalert2";
 import RetroLogModal from "./RetroLogModal";
 import { downloadAttendanceReport } from "./attendanceReportPdf";
 import type { AttendanceReport } from "@/lib/attendance-report";
@@ -112,6 +113,7 @@ export default function HistoryAnalytics({
   });
   const [isLoading, setIsLoading] = useState(false);
   const [refreshCounter, setRefreshCounter] = useState(0);
+  const [deletingKey, setDeletingKey] = useState<string | null>(null);
 
   // Modular Retro Modal Controls
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -219,6 +221,79 @@ export default function HistoryAnalytics({
     }
     setRefreshCounter((prev) => prev + 1);
   };
+
+  const periodText =
+    period === "last-month"
+      ? `Last Month (${karachiMonthLabel(-1)})`
+      : period === "all"
+        ? "all saved records"
+        : `This Month (${karachiMonthLabel(0)})`;
+
+  const deleteAttendance = async (
+    body: { userId: string; date?: string; period?: HistoryProps["period"] },
+    confirm: { title: string; html: string },
+    key: string
+  ) => {
+    const result = await Swal.fire({
+      title: confirm.title,
+      html: confirm.html,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Yes, delete",
+      cancelButtonText: "Cancel",
+      reverseButtons: true,
+      buttonsStyling: false,
+      customClass: {
+        popup: "bg-white border border-line-subtle rounded-2xl shadow-xl p-6 font-sans text-center",
+        title: "text-base font-bold text-content-main",
+        htmlContainer: "text-xs text-content-secondary mt-2 leading-relaxed",
+        actions: "flex gap-2 justify-center mt-5 w-full",
+        confirmButton:
+          "px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-xl transition shadow-sm cursor-pointer",
+        cancelButton:
+          "px-4 py-2.5 bg-surface-main hover:bg-line-subtle text-content-secondary text-xs font-semibold rounded-xl transition cursor-pointer",
+      },
+    });
+    if (!result.isConfirmed) return;
+
+    setDeletingKey(key);
+    try {
+      const res = await fetch("/api/admin/employee-attendance", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const payload = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        deleted?: number;
+        skippedLocked?: number;
+      };
+      if (!res.ok) throw new Error(payload.error || "Could not delete attendance.");
+      setRefreshCounter((prev) => prev + 1);
+      const kept = payload.skippedLocked
+        ? ` ${payload.skippedLocked} locked record${payload.skippedLocked === 1 ? "" : "s"} kept.`
+        : "";
+      Swal.fire({
+        toast: true,
+        position: "top-end",
+        icon: "success",
+        title: `Deleted ${payload.deleted || 0} record${payload.deleted === 1 ? "" : "s"}.${kept}`,
+        showConfirmButton: false,
+        timer: 3000,
+        timerProgressBar: true,
+      });
+    } catch (err) {
+      Swal.fire({
+        icon: "error",
+        title: "Delete failed",
+        text: err instanceof Error ? err.message : "Could not delete attendance.",
+      });
+    } finally {
+      setDeletingKey(null);
+    }
+  };
+
+  const employeeName = employeeProfile.name || selectedEmp?.name || "this employee";
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
@@ -397,6 +472,27 @@ export default function HistoryAnalytics({
             <span className="text-[10px] font-extrabold uppercase tracking-widest text-content-muted">
               Historical Worklogs Ledger
             </span>
+            <div className="flex items-center gap-2">
+              {selectedEmployeeId && !isLocked && (
+                <button
+                  type="button"
+                  disabled={deletingKey !== null}
+                  onClick={() =>
+                    void deleteAttendance(
+                      { userId: selectedEmployeeId, period },
+                      {
+                        title: "Delete attendance history?",
+                        html: `Saved check-in and check-out records for <b>${employeeName}</b> in <b>${periodText}</b> will be removed. Holidays and leave stay. This cannot be undone.`,
+                      },
+                      `period:${period}`
+                    )
+                  }
+                  className="flex items-center gap-1.5 rounded-lg bg-rose-600 px-3 py-1.5 text-[10px] font-bold text-white hover:bg-rose-500 disabled:opacity-50"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  Delete History
+                </button>
+              )}
             <button
               type="button"
               disabled={!report || report.days.length === 0}
@@ -419,6 +515,7 @@ export default function HistoryAnalytics({
             >
               Download PDF
             </button>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -474,13 +571,32 @@ export default function HistoryAnalytics({
                         {!isLocked && (
                           <td className="px-6 py-4 text-right">
                             {log ? (
-                              <button
-                                type="button"
-                                onClick={() => handleOpenEditModal(log)}
-                                className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg cursor-pointer inline-flex items-center justify-center"
-                              >
-                                <Edit2 className="w-3.5 h-3.5" />
-                              </button>
+                              <div className="inline-flex items-center justify-end gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditModal(log)}
+                                  className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg cursor-pointer inline-flex items-center justify-center"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={deletingKey !== null}
+                                  onClick={() =>
+                                    void deleteAttendance(
+                                      { userId: selectedEmployeeId, date: log.date },
+                                      {
+                                        title: "Delete this day?",
+                                        html: `The saved attendance for <b>${employeeName}</b> on <b>${log.date}</b> will be removed. This cannot be undone.`,
+                                      },
+                                      log.date
+                                    )
+                                  }
+                                  className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg cursor-pointer inline-flex items-center justify-center disabled:opacity-50"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                             ) : null}
                           </td>
                         )}

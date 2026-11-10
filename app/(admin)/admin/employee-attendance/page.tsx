@@ -187,6 +187,16 @@ export default function AdminAttendancePage() {
       const log = attendanceLogs.find((l) => l.userId === emp.userId);
       const currentMonthlyRecord = monthlyRecords.find((mr) => mr.userId === emp.userId);
       const isLocked = currentMonthlyRecord?.isLocked ?? false;
+      const checkInDate = log?.checkIn ? new Date(log.checkIn) : null;
+      const checkOutDate = log?.checkOut ? new Date(log.checkOut) : null;
+      const checkOutValid = Boolean(
+        checkInDate &&
+          checkOutDate &&
+          !Number.isNaN(checkInDate.getTime()) &&
+          !Number.isNaN(checkOutDate.getTime()) &&
+          checkOutDate.getTime() > checkInDate.getTime() &&
+          checkOutDate.getTime() <= Date.now() + 2 * 60 * 1000
+      );
 
       return {
         userId: emp.userId,
@@ -199,13 +209,13 @@ export default function AdminAttendancePage() {
         checkIn: log?.checkIn
           ? formatTo12Hour(new Date(log.checkIn).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Karachi" }))
           : "",
-        checkOut: log?.checkOut
-          ? formatTo12Hour(new Date(log.checkOut).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Karachi" }))
-          : "", 
+        checkOut: checkOutValid && checkOutDate
+          ? formatTo12Hour(checkOutDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Karachi" }))
+          : "",
         rawCheckIn: log?.checkIn || null,
-        rawCheckOut: log?.checkOut || null,
-        workingHours: log?.workingHours || 0,
-        formattedDuration: log?.formattedDuration || "",
+        rawCheckOut: checkOutValid ? log?.checkOut || null : null,
+        workingHours: checkOutValid ? log?.workingHours || 0 : 0,
+        formattedDuration: checkOutValid ? log?.formattedDuration || "" : "",
         status: (log?.status || (daySheet?.holiday ? "Holiday" : "Absent")) as AttendanceStatus,
         isLocked,
       };

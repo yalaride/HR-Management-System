@@ -5,6 +5,7 @@ export interface IActivityLog extends Document {
   activityType:
     | "CHECK_IN"
     | "CHECK_OUT"
+    | "ATTENDANCE_DELETED"
     | "LEAVE_REQUEST"
     | "LEAVE_APPROVED"
     | "LEAVE_REJECTED"
@@ -37,6 +38,7 @@ const ActivityLogSchema = new Schema<IActivityLog>(
       enum: [
         "CHECK_IN",
         "CHECK_OUT",
+        "ATTENDANCE_DELETED",
         "LEAVE_REQUEST",
         "LEAVE_APPROVED",
         "LEAVE_REJECTED",
