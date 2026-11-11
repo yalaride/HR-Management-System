@@ -11,7 +11,7 @@ export const HR_POLICY_SECTIONS: PolicySection[] = [
     number: 1,
     title: "Purpose",
     paragraphs: [
-      "This policy is designed to clearly explain the probation period, annual leave, emergency leave, attendance, and break-time requirements for all employees of SYNC UP.",
+      "This policy is designed to clearly explain the probation period, annual leave, emergency leave, and attendance requirements for all employees of SYNC UP.",
     ],
   },
   {
@@ -61,25 +61,15 @@ export const HR_POLICY_SECTIONS: PolicySection[] = [
   },
   {
     number: 7,
-    title: "Break Time",
-    paragraphs: [
-      "The standard break time is from 2:00 PM to 3:00 PM.",
-      "Employees may use this break for refreshments, prayer, and other personal needs.",
-      "All employees are expected to return to their seats and resume their work on time after the break.",
-      "Employees should ensure that the break does not extend beyond the approved break time unless specifically approved by management.",
-    ],
-  },
-  {
-    number: 8,
     title: "Attendance and Compliance",
     paragraphs: [
       "All employees are expected to maintain regular attendance, punctuality, and discipline during working hours.",
       "Employees must follow the leave approval process and inform their reporting manager whenever they are unable to attend work.",
-      "Repeated unauthorized absences, late arrivals, extended breaks, or failure to follow this policy may result in appropriate disciplinary action and/or salary deduction as applicable.",
+      "Repeated unauthorized absences, late arrivals, or failure to follow this policy may result in appropriate disciplinary action and/or salary deduction as applicable.",
     ],
   },
   {
-    number: 9,
+    number: 8,
     title: "Management Rights",
     paragraphs: [
       "SYNC UP reserves the right to review, amend, or update this policy based on business requirements and applicable laws.",

@@ -9,7 +9,6 @@ import {
   Activity,
   Banknote,
   BookOpen,
-  BookOpenCheck,
   Cake,
   CalendarCheck,
   CalendarClock,
@@ -110,11 +109,6 @@ const navItems = {
       href: "/admin/head-leaves",
       label: "Head Leaves",
       icon: <UserCheck className="w-5 h-5 shrink-0" />,
-    },
-    {
-      href: "/admin/leaves-policy",
-      label: "Leaves Policy",
-      icon: <BookOpenCheck className="w-5 h-5 shrink-0" />, // Policy guidelines & rule checks
     },
     {
       href: "/admin/hr-policies",

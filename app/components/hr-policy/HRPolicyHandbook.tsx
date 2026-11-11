@@ -26,7 +26,7 @@ export default function HRPolicyHandbook({ audience }: { audience: "admin" | "em
           <p className="mt-2 max-w-2xl text-sm text-content-secondary">
             {audience === "admin"
               ? "This policy is fixed for every employee. It is not added or edited from the admin panel."
-              : "Read the probation, leave, attendance, and break rules that apply to you at Sync Up."}
+              : "Read the probation, leave, and attendance rules that apply to you at Sync Up."}
           </p>
         </header>
 
