@@ -9,21 +9,28 @@ export interface AttendanceReportRow {
   checkOut: string;
   arrival: string;
   worked: string;
+  extra: string;
   short: string;
   paid: string;
   detail: string;
+  rawExtraMinutes: number;
+  rawShortMinutes: number;
 }
 
 export interface AttendanceReportSummary {
   workingDays: number;
   attendedHours: number;
   paidHours: number;
+  extraHours: number;
+  extraUsedHours: number;
+  leaveCoverHours: number;
   shortHours: number;
   totalHours: number;
   lateDays: number;
   absentDays: number;
   leaveDays: number;
   holidayDays: number;
+  coverNote: string;
 }
 
 export interface AttendanceReport {
@@ -38,6 +45,12 @@ export function formatMinutes(total: number): string {
   const hours = Math.floor(safe / 60);
   const minutes = safe % 60;
   return `${hours} hrs ${minutes} mins`;
+}
+
+const MONTHLY_LEAVE_MINUTES = 20 * 60;
+
+function blankHours(): Pick<AttendanceReportRow, "extra" | "rawExtraMinutes" | "rawShortMinutes"> {
+  return { extra: "—", rawExtraMinutes: 0, rawShortMinutes: 0 };
 }
 
 function hoursFromMinutes(total: number): number {
@@ -154,7 +167,7 @@ function leaveCovers(leave: ReportLeave, date: string): boolean {
 }
 
 function isPaidLeave(type: string): boolean {
-  return type !== "UNPAID";
+  return type.toUpperCase() !== "UNPAID";
 }
 
 export function buildAttendanceReport(input: {
@@ -178,7 +191,7 @@ export function buildAttendanceReport(input: {
   const days: AttendanceReportRow[] = [];
   let attendedMinutes = 0;
   let paidMinutes = 0;
-  let shortMinutes = 0;
+  let allowanceUsedMinutes = 0;
   let lateDays = 0;
   let absentDays = 0;
   let leaveDays = 0;
@@ -205,12 +218,49 @@ export function buildAttendanceReport(input: {
         short: "0 hrs 0 mins",
         paid: "8 hrs 0 mins",
         detail: `Company holiday · ${holiday.title}`,
+        ...blankHours(),
+      });
+      continue;
+    }
+
+    if (leave && leave.type.toUpperCase() === "HALF") {
+      const checkInDate = punch?.checkIn ? new Date(punch.checkIn) : null;
+      const checkOutDate = punch?.checkOut ? new Date(punch.checkOut) : null;
+      const checkIn = checkInDate && !isFutureFingerprint(checkInDate, input.now ?? new Date()) ? checkInDate : null;
+      const checkOut =
+        checkOutDate && checkIn && checkOutDate.getTime() > checkIn.getTime() ? checkOutDate : null;
+      const worked = checkIn && checkOut
+        ? Math.max(0, Math.floor((checkOut.getTime() - checkIn.getTime()) / 60000))
+        : 0;
+      const extra = Math.max(0, worked - REQUIRED_DAY_MINUTES);
+      const paid = REQUIRED_DAY_MINUTES / 2;
+      const countedWork = Math.min(worked, REQUIRED_DAY_MINUTES - paid);
+      const short = Math.max(0, REQUIRED_DAY_MINUTES - countedWork - paid);
+      leaveDays += 1;
+      allowanceUsedMinutes += paid;
+      attendedMinutes += countedWork;
+      paidMinutes += paid;
+      days.push({
+        date,
+        weekday,
+        checkIn: checkIn ? clock(checkIn) : "—",
+        checkOut: checkOut ? clock(checkOut) : "—",
+        arrival: "Paid leave",
+        worked: worked ? formatMinutes(Math.min(worked, REQUIRED_DAY_MINUTES)) : "—",
+        extra: extra ? formatMinutes(extra) : "—",
+        short: formatMinutes(short),
+        paid: "4 hrs 0 mins",
+        detail: short === 0 ? "Half day leave" : `Half day leave · short ${formatMinutes(short)}`,
+        rawExtraMinutes: extra,
+        rawShortMinutes: short,
       });
       continue;
     }
 
     if (leave && isPaidLeave(leave.type)) {
       leaveDays += 1;
+      const countsTowardAllowance = leave.type.toUpperCase() !== "EXTRA_PAID";
+      if (countsTowardAllowance) allowanceUsedMinutes += REQUIRED_DAY_MINUTES;
       paidMinutes += REQUIRED_DAY_MINUTES;
       days.push({
         date,
@@ -221,14 +271,14 @@ export function buildAttendanceReport(input: {
         worked: "—",
         short: "0 hrs 0 mins",
         paid: "8 hrs 0 mins",
-        detail: `Paid ${leave.type.toLowerCase()} leave`,
+        detail: "Paid leave · no deduction",
+        ...blankHours(),
       });
       continue;
     }
 
     if (leave && !isPaidLeave(leave.type)) {
       absentDays += 1;
-      shortMinutes += REQUIRED_DAY_MINUTES;
       days.push({
         date,
         weekday,
@@ -236,9 +286,12 @@ export function buildAttendanceReport(input: {
         checkOut: "—",
         arrival: "Unpaid leave",
         worked: "0 hrs 0 mins",
+        extra: "—",
         short: "8 hrs 0 mins",
         paid: "—",
         detail: "Unpaid leave · 8 hours short",
+        rawExtraMinutes: 0,
+        rawShortMinutes: REQUIRED_DAY_MINUTES,
       });
       continue;
     }
@@ -266,16 +319,18 @@ export function buildAttendanceReport(input: {
         checkOut: "—",
         arrival: punch?.status === "Late" ? "Late" : "On Time",
         worked: "In progress",
+        extra: "—",
         short: "—",
         paid: "—",
         detail: "Checked in, checkout not recorded yet",
+        rawExtraMinutes: 0,
+        rawShortMinutes: -1,
       });
       continue;
     }
 
     if (!hasCheckIn || !hasCheckOut) {
       absentDays += 1;
-      shortMinutes += REQUIRED_DAY_MINUTES;
       days.push({
         date,
         weekday,
@@ -283,9 +338,12 @@ export function buildAttendanceReport(input: {
         checkOut: "—",
         arrival: "Absent",
         worked: "0 hrs 0 mins",
+        extra: "—",
         short: "8 hrs 0 mins",
         paid: "—",
         detail: hasCheckIn ? "No checkout · 8 hours short" : "Absent · 8 hours short",
+        rawExtraMinutes: 0,
+        rawShortMinutes: REQUIRED_DAY_MINUTES,
       });
       continue;
     }
@@ -293,25 +351,61 @@ export function buildAttendanceReport(input: {
     if (!checkIn || !checkOut) continue;
 
     const worked = Math.max(0, Math.floor((checkOut.getTime() - checkIn.getTime()) / 60000));
+    const extra = Math.max(0, worked - REQUIRED_DAY_MINUTES);
     const credited = Math.min(REQUIRED_DAY_MINUTES, worked);
     const short = Math.max(0, REQUIRED_DAY_MINUTES - worked);
     const checkInMinutes = karachiMinutes(checkIn);
     const arrival = checkInMinutes > graceLimit ? "Late" : "On Time";
     if (arrival === "Late") lateDays += 1;
     attendedMinutes += credited;
-    shortMinutes += short;
     days.push({
       date,
       weekday,
       checkIn: clock(checkIn),
       checkOut: clock(checkOut),
       arrival,
-      worked: formatMinutes(credited),
+      worked: formatMinutes(worked),
+      extra: extra ? formatMinutes(extra) : "—",
       short: formatMinutes(short),
       paid: "—",
-      detail: short === 0 ? "8 hours complete" : `Short ${formatMinutes(short)}`,
+      detail: extra ? `Extra ${formatMinutes(extra)}` : short === 0 ? "8 hours complete" : `Short ${formatMinutes(short)}`,
+      rawExtraMinutes: extra,
+      rawShortMinutes: short,
     });
   }
+
+  let extraPool = days.reduce((sum, day) => sum + day.rawExtraMinutes, 0);
+  const extraEarned = extraPool;
+  let leavePool = Math.max(0, MONTHLY_LEAVE_MINUTES - allowanceUsedMinutes);
+  let extraUsed = 0;
+  let leaveCover = 0;
+  let finalShort = 0;
+
+  for (const day of days) {
+    if (day.rawShortMinutes < 0) continue;
+    let gap = day.rawShortMinutes;
+    const fromExtra = Math.min(extraPool, gap);
+    extraPool -= fromExtra;
+    gap -= fromExtra;
+    extraUsed += fromExtra;
+    const fromLeave = Math.min(leavePool, gap);
+    leavePool -= fromLeave;
+    gap -= fromLeave;
+    leaveCover += fromLeave;
+    paidMinutes += fromExtra + fromLeave;
+    finalShort += gap;
+    day.short = gap ? formatMinutes(gap) : "0 hrs 0 mins";
+    const notes: string[] = [];
+    if (day.rawExtraMinutes) notes.push(`Extra ${formatMinutes(day.rawExtraMinutes)}`);
+    if (fromExtra) notes.push(`${formatMinutes(fromExtra)} of this short day is covered by extra hours`);
+    if (fromLeave) notes.push(`${formatMinutes(fromLeave)} covered by the 20-hour monthly leave`);
+    if (gap) notes.push(`Still short ${formatMinutes(gap)}. Extra hours and the monthly leave are not enough.`);
+    if (notes.length) day.detail = notes.join(". ");
+  }
+
+  const coverNote = finalShort
+    ? `Extra hours and the 20-hour monthly leave are not enough. ${formatMinutes(finalShort)} is still short.`
+    : "Short days are covered by extra hours and the 20-hour monthly leave. No hour deduction remains.";
 
   return {
     from: input.from,
@@ -321,12 +415,16 @@ export function buildAttendanceReport(input: {
       workingDays: days.length,
       attendedHours: hoursFromMinutes(attendedMinutes),
       paidHours: hoursFromMinutes(paidMinutes),
-      shortHours: hoursFromMinutes(shortMinutes),
+      extraHours: hoursFromMinutes(extraEarned),
+      extraUsedHours: hoursFromMinutes(extraUsed),
+      leaveCoverHours: hoursFromMinutes(leaveCover),
+      shortHours: hoursFromMinutes(finalShort),
       totalHours: hoursFromMinutes(attendedMinutes + paidMinutes),
       lateDays,
       absentDays,
       leaveDays,
       holidayDays,
+      coverNote,
     },
   };
 }

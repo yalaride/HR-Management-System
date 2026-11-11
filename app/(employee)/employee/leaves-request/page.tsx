@@ -113,7 +113,7 @@ export default function EmployeeLeavesPage() {
   };
 
   const handleApplyLeave = async (formData: {
-    type: "ANNUAL" | "SICK" | "CASUAL";
+    type: "FULL" | "HALF";
     startDate: string;
     endDate: string;
     reason: string;
@@ -157,7 +157,7 @@ export default function EmployeeLeavesPage() {
             My Leave Dashboard
           </h1>
           <p className="mt-1 text-xs text-content-secondary leading-relaxed">
-            Track allocated balances and request new leaves.
+            This month includes 2 full days and 1 half day. A request already counts as used, so the remaining number drops straight away.
           </p>
         </div>
         <button
@@ -202,6 +202,56 @@ export default function EmployeeLeavesPage() {
               </div>
             </div>
           ))}
+        </div>
+      ) : data?.quota?.currentMonth ? (
+        <div className="overflow-hidden rounded-2xl border border-line-subtle bg-white shadow-xs">
+          <div className="flex items-center justify-between gap-3 border-b border-line-subtle bg-slate-50/70 px-5 py-4">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-content-muted">This month</p>
+              <h2 className="mt-1 text-lg font-extrabold text-content-main">{data.quota.currentMonth.label}</h2>
+            </div>
+            <span className="rounded-full bg-white px-3 py-1 text-[10px] font-bold text-content-secondary border border-line-subtle">
+              Does not carry forward
+            </span>
+          </div>
+          <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2">
+            <div className="rounded-2xl border border-indigo-100 bg-indigo-50/50 p-4">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-700">Full days</p>
+              <p className="mt-2 text-3xl font-black text-content-main">
+                {data.quota.currentMonth.fullRemaining}
+                <span className="ml-1 text-sm font-semibold text-content-muted">left of 2</span>
+              </p>
+              <div className="mt-3 flex gap-1.5">
+                {[0, 1].map((slot) => (
+                  <span
+                    key={slot}
+                    className={`h-2 flex-1 rounded-full ${
+                      slot < data.quota.currentMonth.fullUsed ? "bg-indigo-500" : "bg-indigo-100"
+                    }`}
+                  />
+                ))}
+              </div>
+              <p className="mt-2 text-xs font-semibold text-content-secondary">
+                Used {data.quota.currentMonth.fullUsed}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-sky-100 bg-sky-50/60 p-4">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-sky-700">Half day</p>
+              <p className="mt-2 text-3xl font-black text-content-main">
+                {data.quota.currentMonth.halfRemaining}
+                <span className="ml-1 text-sm font-semibold text-content-muted">left of 1</span>
+              </p>
+              <div className="mt-3 h-2 rounded-full bg-sky-100">
+                <div
+                  className="h-2 rounded-full bg-sky-500"
+                  style={{ width: data.quota.currentMonth.halfUsed ? "100%" : "0%" }}
+                />
+              </div>
+              <p className="mt-2 text-xs font-semibold text-content-secondary">
+                Used {data.quota.currentMonth.halfUsed}
+              </p>
+            </div>
+          </div>
         </div>
       ) : balances ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">

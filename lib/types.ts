@@ -6,7 +6,7 @@ export interface LeaveRequest {
   designation: string;
   department: string;
 
-  type: "Annual Leave" | "Sick Leave" | "Casual Leave" | "Unpaid Leave" | "Other Leave";
+  type: "Annual Leave" | "Sick Leave" | "Casual Leave" | "Unpaid Leave" | "Other Leave" | "Full day" | "Half day" | "Urgent leave" | "Extra paid leave";
   startDate: string;
   endDate: string;
   days: number;
@@ -15,6 +15,11 @@ export interface LeaveRequest {
   totalLeaves?: number;
   usedLeaves?: number;
   remainingLeaves?: number;
+  monthLabel?: string;
+  fullUsed?: number;
+  fullRemaining?: number;
+  halfUsed?: number;
+  halfRemaining?: number;
 }
 
 export interface LeaveBalance {

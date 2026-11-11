@@ -55,6 +55,10 @@ const statusConfig: Record<
 };
 
 const typeConfig: Record<string, { label: string; badgeClass: string }> = {
+  FULL: { label: "Full day", badgeClass: "bg-indigo-50/80 text-indigo-700 border-indigo-200/60" },
+  HALF: { label: "Half day", badgeClass: "bg-sky-50/80 text-sky-700 border-sky-200/60" },
+  URGENT: { label: "Urgent leave", badgeClass: "bg-amber-50/80 text-amber-700 border-amber-200/60" },
+  EXTRA_PAID: { label: "Extra paid leave", badgeClass: "bg-emerald-50/80 text-emerald-700 border-emerald-200/60" },
   ANNUAL: {
     label: "Annual Leave",
     badgeClass: "bg-indigo-50/80 text-indigo-700 border-indigo-200/60",

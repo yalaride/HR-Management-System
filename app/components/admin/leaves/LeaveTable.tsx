@@ -84,6 +84,10 @@ export const LeaveTable: React.FC<LeaveTableProps> = ({
     if (key === "SICK") return "Sick Leave";
     if (key === "CASUAL") return "Casual Leave";
     if (key === "UNPAID") return "Unpaid Leave";
+    if (key === "FULL") return "Full day";
+    if (key === "HALF") return "Half day";
+    if (key === "URGENT") return "Urgent leave";
+    if (key === "EXTRA_PAID") return "Extra paid leave";
 
     return "Other Leave";
   };

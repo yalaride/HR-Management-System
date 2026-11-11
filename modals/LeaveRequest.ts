@@ -11,13 +11,13 @@ const LeaveSchema = new Schema(
     type: {
       type: String,
       required: true,
-      enum: ["ANNUAL", "SICK", "CASUAL", "UNPAID"],
+      enum: ["ANNUAL", "SICK", "CASUAL", "UNPAID", "FULL", "HALF", "URGENT", "EXTRA_PAID"],
       uppercase: true,
       trim: true,
     },
     startDate: { type: Date, required: true },
     endDate: { type: Date, required: true },
-    days: { type: Number, required: true, min: 1 },
+    days: { type: Number, required: true, min: 0.5 },
     reason: { type: String, required: true, trim: true },
     status: {
       type: String,

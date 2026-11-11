@@ -8,6 +8,7 @@ import Leave from "@/modals/LeaveRequest";
 import LeaveBalance from "@/modals/LeaveBalance";
 import { Employee } from "@/modals/Employee";
 import { ActivityLog } from "@/modals/ActivityLog";
+import { MONTHLY_FULL_DAYS, MONTHLY_HALF_DAYS, monthKey, monthUsage, type QuotaLeave } from "@/lib/monthly-leave";
 
 type TrackedLeaveType = "ANNUAL" | "SICK" | "CASUAL";
 
@@ -54,6 +55,11 @@ export interface FormattedLeave {
   totalLeaves: number;
   usedLeaves: number;
   remainingLeaves: number;
+  monthLabel?: string;
+  fullUsed?: number;
+  fullRemaining?: number;
+  halfUsed?: number;
+  halfRemaining?: number;
 }
 
 function formatDateString(value: unknown): string {
@@ -123,6 +129,18 @@ export async function listFormattedLeaves(userIds?: string[]): Promise<Formatted
   );
   const balanceByUserId = new Map(balanceDocs.map((doc) => [String(doc.userId || ""), doc]));
 
+  const quotaByUser = new Map<string, QuotaLeave[]>();
+  for (const leave of leaves) {
+    const id = String(leave.userId || "");
+    const entry: QuotaLeave = {
+      type: String(leave.type || ""),
+      status: String(leave.status || ""),
+      startDate: formatDateString(leave.startDate),
+      endDate: formatDateString(leave.endDate),
+    };
+    quotaByUser.set(id, [...(quotaByUser.get(id) || []), entry]);
+  }
+
   return leaves.map((leave) => {
     const leaveUserId = String(leave.userId || "");
     const employeeDoc: LeanEmployeeInfo | null = employeeByUserId.get(leaveUserId) || null;
@@ -135,6 +153,10 @@ export async function listFormattedLeaves(userIds?: string[]): Promise<Formatted
     const isSick = rawType.includes("SICK");
     const isCasual = rawType.includes("CASUAL");
     const isUnpaid = rawType.includes("UNPAID");
+    const isMonthly = rawType === "FULL" || rawType === "HALF" || rawType === "URGENT" || rawType === "EXTRA_PAID";
+    const startDate = formatDateString(leave.startDate);
+    const endDate = formatDateString(leave.endDate);
+    const usage = isMonthly ? monthUsage(quotaByUser.get(leaveUserId) || [], monthKey(startDate)) : null;
 
     let totalLeaves = 0;
     let usedLeaves = 0;
@@ -146,7 +168,15 @@ export async function listFormattedLeaves(userIds?: string[]): Promise<Formatted
     else if (isCasual) matchedKey = "CASUAL";
 
     const trackedBalance = matchedKey && balance ? balance[matchedKey] : undefined;
-    if (trackedBalance) {
+    if (rawType === "HALF") {
+      totalLeaves = MONTHLY_HALF_DAYS;
+      usedLeaves = usage?.half || 0;
+      remainingLeaves = Math.max(0, totalLeaves - usedLeaves);
+    } else if (rawType === "FULL" || rawType === "URGENT") {
+      totalLeaves = MONTHLY_FULL_DAYS;
+      usedLeaves = usage?.full || 0;
+      remainingLeaves = Math.max(0, totalLeaves - usedLeaves);
+    } else if (trackedBalance) {
       totalLeaves = Number(trackedBalance.allocated ?? 15);
       usedLeaves = Number(trackedBalance.used ?? 0);
       remainingLeaves = Math.max(0, totalLeaves - usedLeaves);
@@ -160,7 +190,15 @@ export async function listFormattedLeaves(userIds?: string[]): Promise<Formatted
           ? "Casual Leave"
           : isUnpaid
             ? "Unpaid Leave"
-            : leave.type || "Other Leave";
+            : rawType === "FULL"
+              ? "Full day"
+              : rawType === "HALF"
+                ? "Half day"
+                : rawType === "URGENT"
+                  ? "Urgent leave"
+                  : rawType === "EXTRA_PAID"
+                    ? "Extra paid leave"
+                    : leave.type || "Other Leave";
 
     const statusTitle =
       rawStatus === "APPROVED" ? "Approved" : rawStatus === "REJECTED" ? "Rejected" : "Pending";
@@ -182,7 +220,7 @@ export async function listFormattedLeaves(userIds?: string[]): Promise<Formatted
       profilePhotoUrl: resolvedProfilePhotoUrl,
       designation: resolvedDesignation,
       type: typeTitle,
-      typeUpper: matchedKey || "UNPAID",
+      typeUpper: matchedKey || rawType,
       startDate: formatDateString(leave.startDate),
       endDate: formatDateString(leave.endDate),
       days: Number(leave.days || 0),
@@ -192,6 +230,15 @@ export async function listFormattedLeaves(userIds?: string[]): Promise<Formatted
       totalLeaves,
       usedLeaves,
       remainingLeaves,
+      monthLabel: new Date(`${monthKey(startDate)}-01T00:00:00.000Z`).toLocaleDateString("en-US", {
+        month: "long",
+        year: "numeric",
+        timeZone: "UTC",
+      }),
+      fullUsed: usage?.full,
+      fullRemaining: usage ? Math.max(0, MONTHLY_FULL_DAYS - usage.full) : undefined,
+      halfUsed: usage?.half,
+      halfRemaining: usage ? Math.max(0, MONTHLY_HALF_DAYS - usage.half) : undefined,
     };
   });
 }
@@ -228,8 +275,9 @@ export async function deleteLeaveRequest(id: string): Promise<LeaveDeleteResult>
   const leaveType = String(leaveRequest.type).toUpperCase();
   const days = Number(leaveRequest.days || 0);
   let refundedDays = 0;
+  const legacyType = leaveType === "ANNUAL" || leaveType === "SICK" || leaveType === "CASUAL";
 
-  if (currentStatus !== "REJECTED" && !leaveType.includes("UNPAID")) {
+  if (legacyType && currentStatus !== "REJECTED") {
     const balanceDoc = await LeaveBalance.findOne({ userId: leaveRequest.userId });
     const balance = balanceDoc as LeanLeaveBalance | null;
 
@@ -307,6 +355,7 @@ export async function decideLeaveRequest(
     });
   } else if (targetAction === "REJECT") {
     // Prevents "UNPAID" leaves (or variations like "UNPAID LEAVE") from corrupting and refunding casual leaves
+    if (leaveType === "ANNUAL" || leaveType === "SICK" || leaveType === "CASUAL") {
     if (currentStatus !== "REJECTED" && !leaveType.includes("UNPAID")) {
       const balanceDoc = await LeaveBalance.findOne({ userId: leaveRequest.userId });
       const balance = balanceDoc as LeanLeaveBalance | null;
@@ -328,6 +377,7 @@ export async function decideLeaveRequest(
         balanceDoc.markModified(matchedKey);
         await balanceDoc.save();
       }
+    }
     }
     leaveRequest.status = "REJECTED";
     await leaveRequest.save();

@@ -49,39 +49,10 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
-  if (!(await requireAdmin())) {
-    return NextResponse.json({ error: "Access Denied: Admin role required." }, { status: 403 });
-  }
-  try {
-    await connectDB();
-    const body = await request.json();
-    const values = Object.fromEntries(
-      ["ANNUAL", "SICK", "CASUAL"].map((key) => [key, Number(body[key])])
-    );
-    if (Object.values(values).some((value) => !Number.isInteger(value) || value < 0)) {
-      return NextResponse.json({ error: "Leave values must be non-negative integers." }, { status: 400 });
-    }
-
-    const policy = await GlobalLeavePolicy.findOneAndUpdate(
-      { key: "default" },
-      { $set: { ...values, year: getKarachiDateParts().year } },
-      { new: true, upsert: true, setDefaultsOnInsert: true, runValidators: true }
-    ).lean();
-
-    await LeaveBalance.updateMany(
-      { customPolicy: { $ne: true } },
-      {
-        $set: {
-          "ANNUAL.allocated": values.ANNUAL,
-          "SICK.allocated": values.SICK,
-          "CASUAL.allocated": values.CASUAL,
-        },
-      }
-    );
-    return NextResponse.json({ policy });
-  } catch (error) {
-    console.error("Global leave policy POST error:", error);
-    return NextResponse.json({ error: "Failed to save global leave policy." }, { status: 500 });
-  }
+export async function POST() {
+  return NextResponse.json(
+    { error: "Monthly leave is fixed at 2 full days and 1 half day. It cannot be changed." },
+    { status: 403 }
+  );
 }
+

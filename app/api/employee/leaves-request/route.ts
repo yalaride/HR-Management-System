@@ -15,6 +15,15 @@ import {
   resetLeaveBalancesForNewYear,
 } from "@/lib/leave-proration";
 import { getKarachiDateParts } from "@/lib/birthday-date";
+import {
+  earliestEmployeeStart,
+  karachiToday,
+  monthKey,
+  monthUsage,
+  shiftMonth,
+  validateEmployeeLeave,
+  type QuotaLeave,
+} from "@/lib/monthly-leave";
 
 type TrackedLeaveType = "ANNUAL" | "SICK" | "CASUAL";
 type LeaveRequestType = TrackedLeaveType | "UNPAID";
@@ -151,9 +160,44 @@ export async function GET() {
       status: String(leave.status || "PENDING").toUpperCase(),
     }));
 
+    const today = karachiToday();
+    const currentMonth = monthKey(today);
+    const nextMonth = shiftMonth(currentMonth, 1);
+    const quotaLeaves: QuotaLeave[] = formattedLeaves.map((leave) => ({
+      type: leave.type,
+      status: leave.status,
+      startDate: leave.startDate,
+      endDate: leave.endDate,
+    }));
+    const currentUsage = monthUsage(quotaLeaves, currentMonth);
+    const nextUsage = monthUsage(quotaLeaves, nextMonth);
+
     return NextResponse.json({
       leaves: formattedLeaves,
       balances,
+      quota: {
+        fullDays: 2,
+        halfDays: 1,
+        noticeDays: 2,
+        earliestStart: earliestEmployeeStart(today),
+        currentMonth: {
+          month: currentMonth,
+          label: new Date(`${currentMonth}-01T00:00:00.000Z`).toLocaleDateString("en-US", {
+            month: "long",
+            year: "numeric",
+            timeZone: "UTC",
+          }),
+          fullUsed: currentUsage.full,
+          fullRemaining: Math.max(0, 2 - currentUsage.full),
+          halfUsed: currentUsage.half,
+          halfRemaining: Math.max(0, 1 - currentUsage.half),
+        },
+        nextMonth: {
+          month: nextMonth,
+          fullRemaining: Math.max(0, 2 - nextUsage.full),
+          halfRemaining: Math.max(0, 1 - nextUsage.half),
+        },
+      },
       employmentType,
       canRequestLeave: canUseLeave,
     });
@@ -187,92 +231,57 @@ export async function POST(request: Request) {
     }
 
     const body = (await request.json()) as {
-      type?: LeaveRequestType;
+      type?: string;
       startDate?: string;
       endDate?: string;
       reason?: string;
     };
-    const type = String(body.type || "").toUpperCase() as LeaveRequestType;
-    if (!["ANNUAL", "SICK", "CASUAL", "UNPAID"].includes(type) || !body.startDate || !body.endDate || !body.reason?.trim()) {
-      return NextResponse.json({ error: "Missing or invalid leave request fields." }, { status: 400 });
+    const type = String(body.type || "").toUpperCase();
+    if (!["FULL", "HALF"].includes(type) || !body.startDate || !body.endDate || !body.reason?.trim()) {
+      return NextResponse.json(
+        { error: "Choose a full day or a half day, the dates, and a reason." },
+        { status: 400 }
+      );
     }
 
-    const start = new Date(body.startDate);
-    const end = new Date(body.endDate);
-    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) {
-      return NextResponse.json({ error: "Invalid date range." }, { status: 400 });
+    const today = karachiToday();
+    const existingLeaves = await Leave.find({ userId }).select("type status startDate endDate").lean();
+    const existing: QuotaLeave[] = existingLeaves.map((leave) => ({
+      type: String(leave.type || ""),
+      status: String(leave.status || ""),
+      startDate: formatDate(leave.startDate),
+      endDate: formatDate(leave.endDate),
+    }));
+    const checked = validateEmployeeLeave({
+      kind: type as "FULL" | "HALF",
+      start: body.startDate,
+      end: body.endDate,
+      today,
+      existing,
+    });
+    if (!checked.ok) {
+      return NextResponse.json({ error: checked.error }, { status: 400 });
     }
 
-    // Compare calendar days rather than exact timestamps so same-day requests
-    // are blocked even when existing records contain a different time value.
     const startDay = new Date(`${body.startDate}T00:00:00.000Z`);
     const endDayExclusive = new Date(`${body.endDate}T00:00:00.000Z`);
     endDayExclusive.setUTCDate(endDayExclusive.getUTCDate() + 1);
-
-    const today = new Intl.DateTimeFormat("en-CA", {
-      timeZone: "Asia/Karachi",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(new Date());
-    const startDate = body.startDate;
-    if (startDate < today) {
-      return NextResponse.json({ error: "Leave start date cannot be in the past." }, { status: 400 });
-    }
-
-    if (["ANNUAL", "CASUAL"].includes(type)) {
-      const [year, month, day] = today.split("-").map(Number);
-      const earliest = new Date(Date.UTC(year, month - 1, day + 2)).toISOString().split("T")[0];
-      if (startDate < earliest) {
-        return NextResponse.json(
-          { error: `${type === "ANNUAL" ? "Annual" : "Casual"} leave must be requested at least 2 days in advance.` },
-          { status: 400 }
-        );
-      }
-    }
-
-    // Prevent double-booking: an employee must not have a second leave
-    // request covering any of the same days. Only REJECTED requests are
-    // ignored — PENDING and APPROVED both occupy the requested days.
     const overlappingLeave = await Leave.findOne({
       userId,
       status: { $in: ["PENDING", "APPROVED"] },
       startDate: { $lt: endDayExclusive },
       endDate: { $gte: startDay },
     }).lean();
-
     if (overlappingLeave) {
       return NextResponse.json(
-        {
-          error:
-            "You already have a leave request that covers one or more of these days. " +
-            "Each day can only be included in a single leave request.",
-        },
+        { error: "One of these days is already in another leave request." },
         { status: 409 }
       );
     }
 
-    const days = Math.max(1, Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1);
-    const policy = await getActivePolicy();
-    const balance = await getOrCreateBalance(userId, employee || {}, policy);
-
-    if (type !== "UNPAID") {
-      const entry = balance[type];
-      const allocated = Number(entry.allocated || 0);
-      const used = Number(entry.used || 0);
-      const remaining = Math.max(0, allocated - used);
-      if (remaining < days) {
-        return NextResponse.json(
-          { error: `Insufficient ${type.toLowerCase()} leave balance. Remaining: ${remaining}.` },
-          { status: 400 }
-        );
-      }
-
-      entry.used = used + days;
-      entry.remaining = remaining - days;
-      balance.markModified(type);
-      await balance.save();
-    }
+    const days = checked.days;
+    const start = startDay;
+    const end = new Date(`${body.endDate}T00:00:00.000Z`);
 
     const employeeName = employee?.name || currentUser.name || "Employee";
     const designation = employee?.designation || "Staff Member";

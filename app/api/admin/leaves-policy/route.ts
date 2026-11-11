@@ -140,130 +140,16 @@ export async function GET() {
   }
 }
 // POST: Set or update an employee's customized leave allowances & update balance allocations in sync
-export async function POST(req: Request) {
-  try {
-    await connectDB();
-    const session = await getServerSession(authOptions);
-    const role = String(session?.user?.role ?? "").toLowerCase();
-
-    if (role !== "admin") {
-      return NextResponse.json({ error: "Access Denied: Admin role required." }, { status: 403 });
-    }
-
-    const body = await req.json();
-    const { userId, ANNUAL, SICK, CASUAL } = body;
-
-    if (!userId) {
-      return NextResponse.json({ error: "User ID is required." }, { status: 400 });
-    }
-
-    const annualNum = Number(ANNUAL);
-    const sickNum = Number(SICK);
-    const casualNum = Number(CASUAL);
-
-    if (
-      isNaN(annualNum) || annualNum < 0 ||
-      isNaN(sickNum) || sickNum < 0 ||
-      isNaN(casualNum) || casualNum < 0
-    ) {
-      return NextResponse.json({ error: "All leave values must be non-negative integers." }, { status: 400 });
-    }
-
-    // 1. Update the employee custom configuration
-    const updatedCustomPolicy = await EmployeeLeavePolicy.findOneAndUpdate(
-      { userId },
-      { $set: { ANNUAL: annualNum, SICK: sickNum, CASUAL: casualNum } },
-      { upsert: true, new: true }
-    );
-
-    // 2. Sync changes directly to LeaveBalance and set customPolicy flag to true
-    await LeaveBalance.findOneAndUpdate(
-      { userId },
-      {
-        $set: {
-          "ANNUAL.allocated": annualNum,
-          "SICK.allocated": sickNum,
-          "CASUAL.allocated": casualNum,
-          customPolicy: true,
-          // An explicit custom allowance overrides any mid-year proration, so
-          // record it as the full annual value and clear the proration flag to
-          // keep the yearly reset consistent.
-          annualFullAllocation: annualNum,
-          proratedForYear: null,
-        }
-      },
-      { upsert: true }
-    );
-
-    return NextResponse.json({
-      success: true,
-      message: "Leave allowances updated and active balance synced.",
-      policy: updatedCustomPolicy,
-    });
-  } catch (error) {
-    console.error("Employee leave policies save error:", error);
-    return NextResponse.json({ 
-      error: "Failed to save customized configuration.", 
-      details: error instanceof Error ? error.message : String(error) 
-    }, { status: 500 });
-  }
+export async function POST() {
+  return NextResponse.json(
+    { error: "Monthly leave is fixed at 2 full days and 1 half day. It cannot be changed." },
+    { status: 403 }
+  );
 }
 
-// DELETE: Reverts custom configuration to baseline and resets balance allocations
-export async function DELETE(req: Request) {
-  try {
-    await connectDB();
-    const session = await getServerSession(authOptions);
-    const role = String(session?.user?.role ?? "").toLowerCase();
-
-    if (role !== "admin") {
-      return NextResponse.json({ error: "Access Denied: Admin role required." }, { status: 403 });
-    }
-
-    const { searchParams } = new URL(req.url);
-    const userId = searchParams.get("userId");
-
-    if (!userId) {
-      return NextResponse.json({ error: "User ID is required to remove parameters." }, { status: 400 });
-    }
-    const globalPolicy = (await GlobalLeavePolicy.findOne({ key: "default" }).lean()) as unknown as
-      | GlobalPolicyValues
-      | null;
-    const defaults = {
-      ANNUAL: globalPolicy?.ANNUAL ?? 15,
-      SICK: globalPolicy?.SICK ?? 8,
-      CASUAL: globalPolicy?.CASUAL ?? 6,
-    };
-
-    // 1. Delete custom limit record
-    await EmployeeLeavePolicy.findOneAndDelete({ userId });
-
-    // 2. Sync standard baseline limits to active LeaveBalance and set customPolicy flag to false
-    await LeaveBalance.findOneAndUpdate(
-      { userId },
-      {
-        $set: {
-          "ANNUAL.allocated": defaults.ANNUAL,
-          "SICK.allocated": defaults.SICK,
-          "CASUAL.allocated": defaults.CASUAL,
-          customPolicy: false,
-          // Reverting to the standard baseline also clears any mid-year
-          // proration bookkeeping so the yearly reset stays consistent.
-          annualFullAllocation: defaults.ANNUAL,
-          proratedForYear: null,
-        }
-      }
-    );
-
-    return NextResponse.json({
-      success: true,
-      message: "Policy reset back to standard baseline rules.",
-    });
-  } catch (error) {
-    console.error("Employee leave policy delete error:", error);
-    return NextResponse.json({ 
-      error: "Database operation failed.", 
-      details: error instanceof Error ? error.message : String(error) 
-    }, { status: 500 });
-  }
+export async function DELETE() {
+  return NextResponse.json(
+    { error: "Monthly leave is fixed at 2 full days and 1 half day. It cannot be changed." },
+    { status: 403 }
+  );
 }

@@ -349,8 +349,8 @@ export async function getUserAttendanceHistory(userId: string, period: string | 
     leaves: leaves.map((leave) => ({
       type: leave.type,
       status: leave.status,
-      startDate: getKarachiDateString(new Date(leave.startDate)),
-      endDate: getKarachiDateString(new Date(leave.endDate)),
+      startDate: new Date(leave.startDate).toISOString().slice(0, 10),
+      endDate: new Date(leave.endDate).toISOString().slice(0, 10),
     })),
     holidays,
     omittedDates: omissions.map((item) => item.date),

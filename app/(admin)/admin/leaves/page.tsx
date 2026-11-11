@@ -21,25 +21,17 @@ const mapStatus = (status?: string): "Pending" | "Approved" | "Rejected" => {
 
 const mapType = (
   type?: string
-): "Annual Leave" | "Sick Leave" | "Casual Leave" | "Unpaid Leave" | "Other Leave" => {
-  if (!type) return "Other Leave";
-
-  // If backend already sends title-case, return it directly.
-  const tTitle = String(type).trim();
-  const normalizedTitle = tTitle.toLowerCase();
-  if (normalizedTitle === "annual leave") return "Annual Leave";
-  if (normalizedTitle === "sick leave") return "Sick Leave";
-  if (normalizedTitle === "casual leave") return "Casual Leave";
-  if (normalizedTitle === "unpaid leave") return "Unpaid Leave";
-  if (normalizedTitle === "other leave") return "Other Leave";
-
-  // Otherwise treat it as uppercase key (ANNUAL / SICK / CASUAL / UNPAID)
-  const t = tTitle.toUpperCase();
-  if (t === "ANNUAL") return "Annual Leave";
-  if (t === "SICK") return "Sick Leave";
-  if (t === "CASUAL") return "Casual Leave";
-  if (t === "UNPAID") return "Unpaid Leave";
-
+): LeaveRequest["type"] => {
+  const title = String(type || "").trim();
+  const upper = title.toUpperCase();
+  if (upper === "FULL" || title === "Full day") return "Full day";
+  if (upper === "HALF" || title === "Half day") return "Half day";
+  if (upper === "URGENT" || title === "Urgent leave") return "Urgent leave";
+  if (upper === "EXTRA_PAID" || title === "Extra paid leave") return "Extra paid leave";
+  if (upper === "ANNUAL" || title.toLowerCase() === "annual leave") return "Annual Leave";
+  if (upper === "SICK" || title.toLowerCase() === "sick leave") return "Sick Leave";
+  if (upper === "CASUAL" || title.toLowerCase() === "casual leave") return "Casual Leave";
+  if (upper === "UNPAID" || title.toLowerCase() === "unpaid leave") return "Unpaid Leave";
   return "Other Leave";
 };
 

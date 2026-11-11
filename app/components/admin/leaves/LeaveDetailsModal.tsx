@@ -19,20 +19,24 @@ export const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
 }) => {
   const getLeaveTypeStyles = (type?: string) => {
     const t = String(type || "").toUpperCase();
-    if (t.includes("ANNUAL")) {
+    if (t.includes("ANNUAL") || t.includes("FULL")) {
       return "bg-brand-subtle text-brand-accent border-brand-accent/20";
     }
     if (t.includes("SICK")) {
       return "bg-rose-50 text-rose-700 border-rose-100";
     }
-    if (t.includes("CASUAL")) {
+    if (t.includes("CASUAL") || t.includes("URGENT")) {
       return "bg-amber-50 text-amber-700 border-amber-100";
+    }
+    if (t.includes("HALF") || t.includes("EXTRA")) {
+      return "bg-sky-50 text-sky-700 border-sky-100";
     }
     return "bg-surface-main text-content-secondary border-line-subtle";
   };
 
-  const isExceeded = 
-    leave.remainingLeaves !== undefined && 
+  const isExceeded =
+    leave.fullRemaining === undefined &&
+    leave.remainingLeaves !== undefined &&
     leave.days > leave.remainingLeaves;
 
   return (
@@ -85,10 +89,28 @@ export const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
           {/* Leave Balances Details */}
           <div className="space-y-2">
             <span className="field-label block">
-              Leave Balances
+              {leave.monthLabel ? `${leave.monthLabel} allowance` : "Leave Balances"}
             </span>
-            
-            <div className="grid grid-cols-3 gap-3 bg-surface-main/60 border border-line-subtle rounded-xl p-3">
+
+            {leave.fullRemaining !== undefined ? (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-3 text-center">
+                  <span className="block text-[9px] font-bold uppercase text-indigo-700">Full days left</span>
+                  <span className="text-base font-extrabold text-content-main">
+                    {leave.fullRemaining} <span className="text-[10px] font-medium">of 2</span>
+                  </span>
+                  <span className="mt-1 block text-[10px] font-semibold text-content-secondary">Used {leave.fullUsed ?? 0}</span>
+                </div>
+                <div className="rounded-xl border border-sky-100 bg-sky-50/70 p-3 text-center">
+                  <span className="block text-[9px] font-bold uppercase text-sky-700">Half day left</span>
+                  <span className="text-base font-extrabold text-content-main">
+                    {leave.halfRemaining} <span className="text-[10px] font-medium">of 1</span>
+                  </span>
+                  <span className="mt-1 block text-[10px] font-semibold text-content-secondary">Used {leave.halfUsed ?? 0}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-3 bg-surface-main/60 border border-line-subtle rounded-xl p-3">
               <div className="text-center">
                 <span className="block text-[9px] uppercase font-bold text-content-muted">Total</span>
                 <span className="text-base font-extrabold text-content-main">
@@ -107,7 +129,8 @@ export const LeaveDetailsModal: React.FC<LeaveDetailsModalProps> = ({
                   {leave.remainingLeaves ?? "--"} <span className="text-[10px] font-medium">days</span>
                 </span>
               </div>
-            </div>
+              </div>
+            )}
 
             {isExceeded && isAdmin && (
               <div className="p-2.5 bg-rose-50 border border-rose-100 text-rose-800 text-[11px] font-medium rounded-lg flex items-center gap-2">

@@ -435,6 +435,10 @@ export default function HistoryAnalytics({
                   <div className="text-base font-black text-sky-600 mt-0.5">{report?.summary.paidHours ?? 0} hrs</div>
                 </div>
                 <div className="bg-slate-50 p-2 border border-slate-100 rounded-xl">
+                  <div className="text-[9px] font-extrabold text-indigo-800 uppercase">Extra</div>
+                  <div className="text-base font-black text-indigo-600 mt-0.5">{report?.summary.extraHours ?? 0} hrs</div>
+                </div>
+                <div className="bg-slate-50 p-2 border border-slate-100 rounded-xl">
                   <div className="text-[9px] font-extrabold text-rose-800 uppercase">Short</div>
                   <div className="text-base font-black text-rose-600 mt-0.5">{report?.summary.shortHours ?? 0} hrs</div>
                 </div>
@@ -444,7 +448,7 @@ export default function HistoryAnalytics({
                 </div>
               </div>
               <p className="text-[10px] text-content-secondary leading-relaxed">
-                Monday to Saturday. A full day is 8 hours. Late is only the arrival flag. Paid leave and company holidays add 8 paid hours with no shortfall.
+                {report?.summary.coverNote || "A day over 8 hours keeps the extra. Those hours fill short days first, then the 20-hour monthly leave is used."}
               </p>
             </>
           )}
@@ -492,6 +496,7 @@ export default function HistoryAnalytics({
                   <th className="px-6 py-4">Check-In</th>
                   <th className="px-6 py-4">Check-Out</th>
                   <th className="px-6 py-4">Worked</th>
+                  <th className="px-6 py-4">Extra</th>
                   <th className="px-6 py-4">Short</th>
                   <th className="px-6 py-4">Paid</th>
                   <th className="px-6 py-4 text-center">Status</th>
@@ -501,13 +506,13 @@ export default function HistoryAnalytics({
               <tbody className="divide-y divide-slate-100 text-xs">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={8} className="px-6 py-12 text-center text-content-secondary animate-pulse">
+                    <td colSpan={9} className="px-6 py-12 text-center text-content-secondary animate-pulse">
                       Retrieving partitioned logs database...
                     </td>
                   </tr>
                 ) : (report?.days.length || 0) === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-6 py-12 text-center text-content-secondary">
+                    <td colSpan={9} className="px-6 py-12 text-center text-content-secondary">
                       No matching historical logs found for the selected date range.
                     </td>
                   </tr>
@@ -526,6 +531,7 @@ export default function HistoryAnalytics({
                         <td className="px-6 py-4 font-mono font-semibold">{row.checkIn}</td>
                         <td className="px-6 py-4 font-mono font-semibold">{row.checkOut}</td>
                         <td className="px-6 py-4 font-mono font-bold text-slate-500">{row.worked}</td>
+                        <td className="px-6 py-4 font-mono font-bold text-indigo-700">{row.extra}</td>
                         <td className="px-6 py-4 font-mono font-extrabold text-rose-600">{row.short}</td>
                         <td className="px-6 py-4 font-mono font-bold text-sky-700">{row.paid}</td>
                         <td className="px-6 py-4 text-center">

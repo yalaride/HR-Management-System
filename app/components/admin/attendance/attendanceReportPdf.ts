@@ -32,14 +32,15 @@ export async function downloadAttendanceReport(input: AttendancePdfInput) {
   doc.setFontSize(9);
   const cards = [
     ["Attended", `${summary.attendedHours} hrs`],
-    ["Paid leave & holidays", `${summary.paidHours} hrs`],
+    ["Extra", `${summary.extraHours} hrs`],
+    ["Paid", `${summary.paidHours} hrs`],
     ["Short", `${summary.shortHours} hrs`],
-    ["Total payable", `${summary.totalHours} hrs`],
+    ["Payable", `${summary.totalHours} hrs`],
   ];
   cards.forEach((card, index) => {
-    const x = 12 + index * 68;
+    const x = 12 + index * 55;
     doc.setDrawColor(226, 232, 240);
-    doc.roundedRect(x, 28, 64, 16, 2, 2);
+    doc.roundedRect(x, 28, 52, 16, 2, 2);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.setTextColor(100, 116, 139);
@@ -52,15 +53,13 @@ export async function downloadAttendanceReport(input: AttendancePdfInput) {
 
   doc.setFontSize(8);
   doc.setTextColor(100, 116, 139);
-  doc.text(
-    `Monday–Saturday  ·  8 hours required  ·  Late days ${summary.lateDays}  ·  Leave ${summary.leaveDays}  ·  Holidays ${summary.holidayDays}  ·  Absent ${summary.absentDays}`,
-    12,
-    52
-  );
+  const note = `Extra used to cover short days: ${summary.extraUsedHours} hrs. Monthly leave used: ${summary.leaveCoverHours} hrs of 20. ${summary.coverNote}`;
+  const noteLines = doc.splitTextToSize(note, pageWidth - 24);
+  doc.text(noteLines, 12, 50);
 
-  const columns = ["Date", "Day", "In", "Out", "Arrival", "Worked", "Short", "Paid", "Detail"];
-  const widths = [24, 22, 24, 24, 24, 28, 28, 28, 68];
-  let y = 58;
+  const columns = ["Date", "Day", "In", "Out", "Arrival", "Worked", "Extra", "Short", "Paid", "Detail"];
+  const widths = [22, 18, 22, 22, 22, 24, 22, 22, 22, 72];
+  let y = 52 + noteLines.length * 4;
 
   const drawHead = () => {
     doc.setFillColor(241, 245, 249);
@@ -96,6 +95,7 @@ export async function downloadAttendanceReport(input: AttendancePdfInput) {
       row.checkOut,
       row.arrival,
       row.worked,
+      row.extra,
       row.short,
       row.paid,
       row.detail,

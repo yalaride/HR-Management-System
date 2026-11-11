@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import useSWR from "swr";
 import Swal from "sweetalert2";
+import { useSession } from "next-auth/react";
 import { 
   CalendarCheck, 
   Clock, 
@@ -16,7 +17,7 @@ import {
   UserMinus,
   Activity
 } from "lucide-react";
-import { useSession } from "next-auth/react";
+import { workingEndDate } from "@/lib/monthly-leave";
 import PayslipList from "@/app/components/payslips/PayslipList";
 import { PayslipRecord } from "@/app/components/payslips/payslipPdf";
 import { MetricCard } from "@/app/components/admin/dashbord/MetricCard";
@@ -91,9 +92,9 @@ export default function EmployeeDashboardPage() {
   const [leaveAppliedNotice, setLeaveAppliedNotice] = useState(false);
 
   const [leaveForm, setLeaveForm] = useState({
-    type: "Annual Leave",
+    type: "FULL",
     startDate: "",
-    endDate: "",
+    endDate: "1",
     reason: "",
   });
 
@@ -202,15 +203,19 @@ export default function EmployeeDashboardPage() {
     e.preventDefault();
     if (!leaveForm.startDate || !leaveForm.endDate || !leaveForm.reason) return;
 
+    const endDate = leaveForm.type === "HALF"
+      ? leaveForm.startDate
+      : workingEndDate(leaveForm.startDate, leaveForm.endDate === "2" ? 2 : 1);
     try {
       const res = await fetch("/api/employee/leaves-request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(leaveForm),
+        body: JSON.stringify({ ...leaveForm, endDate }),
       });
 
+      const responseData = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error("API call was unsuccessful");
+        throw new Error(responseData.error || "Could not submit the leave request.");
       }
 
       setIsLeaveModalOpen(false);
@@ -219,9 +224,9 @@ export default function EmployeeDashboardPage() {
       await refreshLeaves();
 
       setLeaveForm({
-        type: "Annual Leave",
+        type: "FULL",
         startDate: "",
-        endDate: "",
+        endDate: "1",
         reason: "",
       });
 
@@ -233,7 +238,7 @@ export default function EmployeeDashboardPage() {
       console.error("Error submitting leave request:", err);
       Swal.fire({
         title: "Error",
-        text: "Could not submit your leave application. Please try again.",
+        text: err instanceof Error ? err.message : "Could not submit your leave application. Please try again.",
         icon: "error",
         customClass: swalCustomClass,
       });
@@ -469,52 +474,64 @@ export default function EmployeeDashboardPage() {
                   onClick={() => setIsLeaveTypeDropdownOpen(!isLeaveTypeDropdownOpen)}
                   className="w-full px-3 py-2 bg-surface-card border border-line-subtle rounded-xl text-xs text-content-main flex items-center justify-between text-left cursor-pointer"
                 >
-                  <span>{leaveForm.type}</span>
+                  <span>{leaveForm.type === "HALF" ? "Half day" : "Full day"}</span>
                   <ChevronDown className={`w-3.5 h-3.5 text-content-muted transition-transform duration-200 ${isLeaveTypeDropdownOpen ? "rotate-180" : ""}`} />
                 </button>
 
                 {isLeaveTypeDropdownOpen && (
                   <div className="dropdown-panel absolute left-0 right-0 mt-1.5 max-h-40 overflow-y-auto z-50">
-                    {["Annual Leave", "Sick Leave", "Casual Leave", "Unpaid Leave"].map((type) => (
+                    {["FULL", "HALF"].map((type) => (
                       <button
                         key={type}
                         type="button"
                         onClick={() => {
-                          setLeaveForm({ ...leaveForm, type });
+                          setLeaveForm({
+                            ...leaveForm,
+                            type,
+                            endDate: type === "HALF" ? leaveForm.startDate : leaveForm.endDate,
+                          });
                           setIsLeaveTypeDropdownOpen(false);
                         }}
                         className={`dropdown-option ${leaveForm.type === type ? "dropdown-option-active" : ""}`}
                       >
-                        {type}
+                        {type === "FULL" ? "Full day" : "Half day"}
                       </button>
                     ))}
                   </div>
                 )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">Start Date</label>
-                    <input
-                      type="date"
-                      required
-                      value={leaveForm.startDate}
-                      onChange={(e) => setLeaveForm({ ...leaveForm, startDate: e.target.value })}
-                      className="form-input text-xs cursor-pointer"
-                    />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">End Date</label>
-                  <input
-                    type="date"
-                    required
-                    value={leaveForm.endDate}
-                    onChange={(e) => setLeaveForm({ ...leaveForm, endDate: e.target.value })}
-                    className="w-full px-3 py-2 bg-surface-card border border-line-subtle rounded-xl text-xs text-content-main cursor-pointer"
-                  />
-                </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">Date</label>
+                <input
+                  type="date"
+                  required
+                  value={leaveForm.startDate}
+                  onChange={(e) => setLeaveForm({ ...leaveForm, startDate: e.target.value, endDate: e.target.value })}
+                  className="form-input text-xs cursor-pointer"
+                />
               </div>
+              {leaveForm.type === "FULL" && (
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">Length</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {([1, 2] as const).map((count) => (
+                      <button
+                        key={count}
+                        type="button"
+                        onClick={() => setLeaveForm({ ...leaveForm, endDate: String(count) })}
+                        className={`rounded-xl border px-3 py-2 text-xs font-bold ${
+                          leaveForm.endDate === String(count)
+                            ? "border-brand-accent bg-brand-subtle text-brand-accent"
+                            : "border-line-subtle text-content-secondary"
+                        }`}
+                      >
+                        {count} day{count === 2 ? "s" : ""}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold uppercase tracking-wider text-content-muted block">Reason for Request</label>

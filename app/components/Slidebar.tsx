@@ -102,6 +102,11 @@ const navItems = {
       icon: <CalendarCheck className="w-5 h-5 shrink-0" />, // Calendar approval / management
     },
     {
+      href: "/admin/grant-leave",
+      label: "Set Leave",
+      icon: <CalendarRange className="w-5 h-5 shrink-0" />,
+    },
+    {
       href: "/admin/head-leaves",
       label: "Head Leaves",
       icon: <UserCheck className="w-5 h-5 shrink-0" />,
@@ -373,6 +378,12 @@ export default function Sidebar({ role }: SidebarProps) {
     icon: <UserCheck className="w-5 h-5 shrink-0" />,
   };
 
+  const grantLeaveNavItem = {
+    href: "/employee/grant-leave",
+    label: "Set Leave",
+    icon: <CalendarRange className="w-5 h-5 shrink-0" />,
+  };
+
   let activeNavItems = [...navItems[displayRole]];
   if (displayRole === "employee" && isDepartmentHead) {
     activeNavItems = [...activeNavItems, ...departmentHeadNavItems];
@@ -384,11 +395,12 @@ export default function Sidebar({ role }: SidebarProps) {
         ...activeNavItems.slice(0, profileIdx),
         attendanceDeskNavItem,
         headLeavesNavItem,
+        grantLeaveNavItem,
         auditLogNavItem,
         ...activeNavItems.slice(profileIdx),
       ];
     } else {
-      activeNavItems = [...activeNavItems, attendanceDeskNavItem, headLeavesNavItem, auditLogNavItem];
+      activeNavItems = [...activeNavItems, attendanceDeskNavItem, headLeavesNavItem, grantLeaveNavItem, auditLogNavItem];
     }
   }
 
