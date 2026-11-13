@@ -66,6 +66,7 @@ interface HistoryProps {
   shiftStart?: string;
   shiftEnd?: string;
   canDelete?: boolean;
+  showHourNotes?: boolean;
 }
 
 /** Converts "HH:MM" 24-hour time string to 12-hour AM/PM format */
@@ -104,6 +105,7 @@ export default function HistoryAnalytics({
   shiftStart = "12:00",
   shiftEnd = "20:00",
   canDelete = false,
+  showHourNotes = false,
 }: HistoryProps) {
   const [logs, setLogs] = useState<AttendanceLog[]>([]);
   const [report, setReport] = useState<AttendanceReport | null>(null);
@@ -448,7 +450,9 @@ export default function HistoryAnalytics({
                 </div>
               </div>
               <p className="text-[10px] text-content-secondary leading-relaxed">
-                {report?.summary.coverNote || "A day over 8 hours keeps the extra. Those hours fill short days first, then the 20-hour monthly leave is used."}
+                {showHourNotes
+                  ? report?.summary.coverNote || "A day over 8 hours keeps the extra. Those hours fill short days first, then the 20-hour monthly leave is used."
+                  : "Monday to Saturday. A full day is 8 hours."}
               </p>
             </>
           )}
@@ -538,7 +542,9 @@ export default function HistoryAnalytics({
                           <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide uppercase border ${badgeStyle}`}>
                             {row.arrival}
                           </span>
-                          <div className="mt-1 text-[10px] text-content-secondary">{row.detail}</div>
+                          {showHourNotes ? (
+                            <div className="mt-1 text-[10px] text-content-secondary">{row.detail}</div>
+                          ) : null}
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="inline-flex items-center justify-end gap-1">

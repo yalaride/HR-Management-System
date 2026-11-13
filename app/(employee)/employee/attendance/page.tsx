@@ -20,15 +20,6 @@ interface AttendanceRecord {
   status: "On Time" | "Late" | "Absent";
 }
 
-interface ActiveSettings {
-  shiftStart: string;
-  shiftEnd: string;
-  gracePeriod: number;
-  checkInDisplayBefore: number;
-  checkOutDisplayAfter: number;
-  autoCheckOut: boolean;
-}
-
 function ClockWidget() {
   const [currentTime, setCurrentTime] = useState<string>("--:--:--");
 
@@ -56,15 +47,6 @@ function ClockWidget() {
   );
 }
 
-const DEFAULT_SETTINGS: ActiveSettings = {
-  shiftStart: "09:00",
-  shiftEnd: "17:00",
-  gracePeriod: 15,
-  checkInDisplayBefore: 30,
-  checkOutDisplayAfter: 30,
-  autoCheckOut: false,
-};
-
 export default function EmployeeAttendancePage() {
   // Shares the "/api/employee/attendance" cache with the employee dashboard,
   // so switching between the two pages is instant.
@@ -76,12 +58,10 @@ export default function EmployeeAttendancePage() {
   } = useSWR<{
     todayRecord?: AttendanceRecord | null;
     history?: AttendanceRecord[];
-    settings?: ActiveSettings;
   }>("/api/employee/attendance");
 
   const todayRecord = attendanceData?.todayRecord || null;
   const history = useMemo(() => attendanceData?.history || [], [attendanceData]);
-  const settings = attendanceData?.settings || DEFAULT_SETTINGS;
 
   // Total accumulated working hours excluding Absent days
   const totalAccumulatedHours = useMemo(() => {
@@ -163,7 +143,7 @@ export default function EmployeeAttendancePage() {
       <div className="flex items-start gap-3 rounded-xl border border-brand-subtle bg-brand-subtle/50 p-4 text-xs text-content-main">
         <Fingerprint className="mt-0.5 h-4 w-4 shrink-0 text-brand-accent" />
         <p>
-          Check-in and check-out happen on the fingerprint device. Arrivals after the {settings.gracePeriod || 15} minute grace period are marked Late.
+          Check-in and check-out happen on the fingerprint device.
         </p>
       </div>
 

@@ -68,7 +68,7 @@ function formatShiftTime(shift: string): string {
   return formatTo12Hour(shift.trim());
 }
 
-type AttendanceStatus = "On Time" | "Late" | "Absent" | "Holiday";
+type AttendanceStatus = "On Time" | "Late" | "Absent" | "Holiday" | "Leave";
 
 interface EmployeeRecord {
   id: string;
@@ -121,6 +121,7 @@ interface DaySheetResponse {
   monthlyRecords?: MonthlyRecord[];
   companySettings?: CompanySettings;
   holiday?: { title: string; startDate: string; endDate: string } | null;
+  leaves?: { userId: string; type: string }[];
 }
 
 export default function AdminAttendancePage() {
@@ -200,6 +201,15 @@ export default function AdminAttendancePage() {
           checkOutDate.getTime() <= Date.now() + 2 * 60 * 1000
       );
 
+      const onLeave = (daySheet?.leaves || []).some((leave) => leave.userId === String(emp.userId));
+      const status: AttendanceStatus = log?.checkIn && log.status && log.status !== "Absent"
+        ? log.status
+        : onLeave
+          ? "Leave"
+          : daySheet?.holiday
+            ? "Holiday"
+            : "Absent";
+
       return {
         userId: emp.userId,
         name: emp.name,
@@ -218,11 +228,11 @@ export default function AdminAttendancePage() {
         rawCheckOut: checkOutValid ? log?.checkOut || null : null,
         workingHours: checkOutValid ? log?.workingHours || 0 : 0,
         formattedDuration: checkOutValid ? log?.formattedDuration || "" : "",
-        status: (log?.status || (daySheet?.holiday ? "Holiday" : "Absent")) as AttendanceStatus,
+        status,
         isLocked,
       };
     });
-  }, [employees, attendanceLogs, monthlyRecords, shiftTimeLabel, daySheet?.holiday]);
+  }, [employees, attendanceLogs, monthlyRecords, shiftTimeLabel, daySheet?.holiday, daySheet?.leaves]);
 
   const metrics = useMemo(() => {
     const presentCount = mergedRecords.filter((r) => r.status === "On Time" || r.status === "Late").length;
@@ -421,7 +431,7 @@ export default function AdminAttendancePage() {
                 )
               ),
             ]}
-            statuses={["All", "On Time", "Late", "Absent", "Holiday"]}
+            statuses={["All", "On Time", "Late", "Absent", "Leave", "Holiday"]}
             onClear={() => {
               setSearchQuery("");
               setFilterDept("All");
@@ -454,6 +464,7 @@ export default function AdminAttendancePage() {
           shiftStart={companySettings?.shiftStart || "12:00"}
           shiftEnd={companySettings?.shiftEnd || "20:00"}
           canDelete={canDeleteRows}
+          showHourNotes={canEditShiftRules || canDeleteRows}
         />
       )}
 

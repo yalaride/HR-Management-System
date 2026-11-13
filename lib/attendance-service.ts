@@ -197,13 +197,22 @@ export async function getDayAttendanceSheet(date: string, options: DaySheetOptio
     employeeFind.select("userId name designation department employeeId profilePhotoUrl status joinDate");
   }
 
-  const [employees, allLogs, allMonthlyRecords, holiday] = await Promise.all([
+  const dayStart = new Date(`${date}T00:00:00.000Z`);
+  const dayEnd = new Date(`${date}T23:59:59.999Z`);
+  const [employees, allLogs, allMonthlyRecords, holiday, approvedLeaves] = await Promise.all([
     employeeFind.lean(),
     Attendance.find({ date }).lean(),
     MonthlyAttendance.find({ year, month }).lean(),
     Holiday.findOne({ startDate: { $lte: date }, endDate: { $gte: date } })
       .select("title startDate endDate")
       .lean<{ title: string; startDate: string; endDate: string } | null>(),
+    Leave.find({
+      status: "APPROVED",
+      startDate: { $lte: dayEnd },
+      endDate: { $gte: dayStart },
+    })
+      .select("userId type")
+      .lean<{ userId?: string; type?: string }[]>(),
   ]);
 
   type LeanEmployeeDoc = Record<string, unknown> & { userId?: unknown; shiftTime?: string };
@@ -236,6 +245,10 @@ export async function getDayAttendanceSheet(date: string, options: DaySheetOptio
     shiftTimeLabel,
     companySettings: settings,
     holiday: holiday ? { title: holiday.title, startDate: holiday.startDate, endDate: holiday.endDate } : null,
+    leaves: approvedLeaves.map((leave) => ({
+      userId: String(leave.userId || ""),
+      type: String(leave.type || ""),
+    })),
   };
 }
 

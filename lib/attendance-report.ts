@@ -53,6 +53,10 @@ function blankHours(): Pick<AttendanceReportRow, "extra" | "rawExtraMinutes" | "
   return { extra: "—", rawExtraMinutes: 0, rawShortMinutes: 0 };
 }
 
+function displayShort(minutes: number): string {
+  return minutes > 0 ? formatMinutes(minutes) : "—";
+}
+
 function hoursFromMinutes(total: number): number {
   return Math.round((total / 60) * 100) / 100;
 }
@@ -215,7 +219,7 @@ export function buildAttendanceReport(input: {
         checkOut: "—",
         arrival: "Holiday",
         worked: "—",
-        short: "0 hrs 0 mins",
+        short: "—",
         paid: "8 hrs 0 mins",
         detail: `Company holiday · ${holiday.title}`,
         ...blankHours(),
@@ -248,7 +252,7 @@ export function buildAttendanceReport(input: {
         arrival: "Paid leave",
         worked: worked ? formatMinutes(Math.min(worked, REQUIRED_DAY_MINUTES)) : "—",
         extra: extra ? formatMinutes(extra) : "—",
-        short: formatMinutes(short),
+        short: displayShort(short),
         paid: "4 hrs 0 mins",
         detail: short === 0 ? "Half day leave" : `Half day leave · short ${formatMinutes(short)}`,
         rawExtraMinutes: extra,
@@ -269,7 +273,7 @@ export function buildAttendanceReport(input: {
         checkOut: "—",
         arrival: "Paid leave",
         worked: "—",
-        short: "0 hrs 0 mins",
+        short: "—",
         paid: "8 hrs 0 mins",
         detail: "Paid leave · no deduction",
         ...blankHours(),
@@ -366,7 +370,7 @@ export function buildAttendanceReport(input: {
       arrival,
       worked: formatMinutes(worked),
       extra: extra ? formatMinutes(extra) : "—",
-      short: formatMinutes(short),
+      short: displayShort(short),
       paid: "—",
       detail: extra ? `Extra ${formatMinutes(extra)}` : short === 0 ? "8 hours complete" : `Short ${formatMinutes(short)}`,
       rawExtraMinutes: extra,
@@ -394,7 +398,7 @@ export function buildAttendanceReport(input: {
     leaveCover += fromLeave;
     paidMinutes += fromExtra + fromLeave;
     finalShort += gap;
-    day.short = gap ? formatMinutes(gap) : "0 hrs 0 mins";
+    day.short = displayShort(gap);
     const notes: string[] = [];
     if (day.rawExtraMinutes) notes.push(`Extra ${formatMinutes(day.rawExtraMinutes)}`);
     if (fromExtra) notes.push(`${formatMinutes(fromExtra)} of this short day is covered by extra hours`);

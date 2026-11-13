@@ -15,7 +15,7 @@ interface RecordRow {
   rawCheckOut: string | null;
   workingHours: number;
   formattedDuration: string;
-  status: "On Time" | "Late" | "Absent" | "Holiday";
+  status: "On Time" | "Late" | "Absent" | "Holiday" | "Leave";
   isLocked: boolean;
   // Optional profile photo fields (backend may provide any of these)
   profilePhotoUrl?: string;
@@ -63,6 +63,7 @@ export default function AttendanceTable({
                 if (rec.status === "On Time") badgeStyle = "bg-emerald-50 text-emerald-700 border-emerald-100";
                 if (rec.status === "Late") badgeStyle = "bg-amber-50 text-amber-700 border-amber-100";
                 if (rec.status === "Absent") badgeStyle = "bg-rose-50 text-rose-700 border-rose-100";
+                if (rec.status === "Leave") badgeStyle = "bg-violet-50 text-violet-700 border-violet-100";
                 if (rec.status === "Holiday") badgeStyle = "bg-sky-50 text-sky-700 border-sky-100";
 
                 const isOnDuty = rec.rawCheckIn && !rec.rawCheckOut;
