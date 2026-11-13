@@ -6,11 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint .",
-    "db:test": "node scripts/test-db-connection.mjs",
-    "seed:admin": "node scripts/seed-admin.mjs",
-    "test:email": "node scripts/test-resend-email.mjs",
-    "test:birthday-email": "node scripts/test-birthday-email.mjs"
+    "lint": "eslint ."
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

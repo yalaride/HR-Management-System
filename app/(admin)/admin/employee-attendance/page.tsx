@@ -292,7 +292,22 @@ export default function AdminAttendancePage() {
       setIsAddModalOpen(false);
       setIsEditModalOpen(false);
       triggerToast("Timesheet adjusted successfully.");
-      await refreshDaySheet();
+      void refreshDaySheet(
+        (current) => {
+          if (!current || payload.date !== filterDate) return current;
+          const logs = (current.logs || []).filter((log) => String(log.userId) !== String(payload.userId));
+          if (payload.status !== "Absent" && payload.checkIn) {
+            logs.push({
+              userId: payload.userId,
+              checkIn: payload.checkIn,
+              checkOut: payload.checkOut,
+              status: payload.status === "Late" ? "Late" : "On Time",
+            });
+          }
+          return { ...current, logs };
+        },
+        { revalidate: true }
+      );
     } else {
       const errData = await res.json();
       throw new Error(errData?.error || "Action adjustment failed.");

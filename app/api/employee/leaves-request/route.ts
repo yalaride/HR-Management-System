@@ -5,16 +5,8 @@ import { getServerSession } from "next-auth";
 import connectDB from "@/lib/mongodb";
 import { authOptions } from "@/lib/auth";
 import Leave from "@/modals/LeaveRequest";
-import LeaveBalance from "@/modals/LeaveBalance";
 import { Employee } from "@/modals/Employee";
 import { ActivityLog } from "@/modals/ActivityLog";
-import { GlobalLeavePolicy } from "@/modals/GlobalLeavePolicy";
-import {
-  applyEmployeeLeaveProration,
-  DEFAULT_LEAVE_POLICY,
-  resetLeaveBalancesForNewYear,
-} from "@/lib/leave-proration";
-import { getKarachiDateParts } from "@/lib/birthday-date";
 import {
   earliestEmployeeStart,
   karachiToday,
@@ -24,9 +16,6 @@ import {
   validateEmployeeLeave,
   type QuotaLeave,
 } from "@/lib/monthly-leave";
-
-type TrackedLeaveType = "ANNUAL" | "SICK" | "CASUAL";
-type LeaveRequestType = TrackedLeaveType | "UNPAID";
 
 interface SessionUser {
   id?: string;
@@ -43,89 +32,15 @@ interface EmployeeInfo {
   joinDate?: Date | string | null;
 }
 
-interface PolicyValues {
-  year: number;
-  ANNUAL: number;
-  SICK: number;
-  CASUAL: number;
-}
-
 function formatDate(value: unknown): string {
   const date = new Date(value as string | number | Date);
   return Number.isNaN(date.getTime()) ? "" : date.toISOString().split("T")[0];
-}
-
-async function getActivePolicy(): Promise<PolicyValues> {
-  const currentYear = getKarachiDateParts().year; // Asia/Karachi year — aligned with midnight leave-reset cron
-  let policy = (await GlobalLeavePolicy.findOneAndUpdate(
-    { key: "default" },
-    {
-      $setOnInsert: {
-        key: "default",
-        year: currentYear,
-        ...DEFAULT_LEAVE_POLICY,
-      },
-    },
-    { new: true, upsert: true, setDefaultsOnInsert: true }
-  ).lean()) as unknown as PolicyValues;
-
-  if (policy.year < currentYear) {
-    await resetLeaveBalancesForNewYear(currentYear, policy);
-    policy = (await GlobalLeavePolicy.findOneAndUpdate(
-      { key: "default" },
-      { $set: { year: currentYear } },
-      { new: true }
-    ).lean()) as unknown as PolicyValues;
-  }
-
-  return {
-    year: currentYear,
-    ANNUAL: Number(policy.ANNUAL ?? DEFAULT_LEAVE_POLICY.ANNUAL),
-    SICK: Number(policy.SICK ?? DEFAULT_LEAVE_POLICY.SICK),
-    CASUAL: Number(policy.CASUAL ?? DEFAULT_LEAVE_POLICY.CASUAL),
-  };
 }
 
 async function getEmployee(userId: string): Promise<EmployeeInfo | null> {
   return Employee.findOne({ userId })
     .select("name designation employmentType confirmationDate joinDate")
     .lean<EmployeeInfo>();
-}
-
-async function getOrCreateBalance(
-  userId: string,
-  employee: EmployeeInfo,
-  policy: PolicyValues
-) {
-  if (employee.joinDate) {
-    await applyEmployeeLeaveProration(userId, new Date(employee.joinDate));
-  }
-  const balance = await LeaveBalance.findOne({ userId });
-  if (balance) return balance;
-  return LeaveBalance.create({
-    userId,
-    ANNUAL: { allocated: policy.ANNUAL, used: 0, remaining: policy.ANNUAL },
-    SICK: { allocated: policy.SICK, used: 0, remaining: policy.SICK },
-    CASUAL: { allocated: policy.CASUAL, used: 0, remaining: policy.CASUAL },
-  });
-}
-
-function serializeBalances(balance: Awaited<ReturnType<typeof getOrCreateBalance>>, visible: boolean) {
-  const types = ["ANNUAL", "SICK", "CASUAL"] as const;
-  return Object.fromEntries(
-    types.map((type) => {
-      const allocated = visible ? Number(balance[type]?.allocated ?? 0) : 0;
-      const used = visible ? Number(balance[type]?.used ?? 0) : 0;
-      return [
-        type,
-        {
-          allocated,
-          used,
-          remaining: Math.max(0, allocated - used),
-        },
-      ];
-    })
-  ) as Record<TrackedLeaveType, { allocated: number; used: number; remaining: number }>;
 }
 
 export async function GET() {
@@ -145,9 +60,6 @@ export async function GET() {
     const employee = await getEmployee(userId);
     const employmentType = employee?.employmentType || "Probation";
     const canUseLeave = ["permanent", "contract"].includes(employmentType.toLowerCase());
-    const policy = await getActivePolicy();
-    const balance = await getOrCreateBalance(userId, employee || {}, policy);
-    const balances = serializeBalances(balance, true);
 
     const leaves = await Leave.find({ userId }).sort({ createdAt: -1 }).lean();
     const formattedLeaves = leaves.map((leave) => ({
@@ -174,7 +86,6 @@ export async function GET() {
 
     return NextResponse.json({
       leaves: formattedLeaves,
-      balances,
       quota: {
         fullDays: 2,
         halfDays: 1,

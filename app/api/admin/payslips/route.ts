@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 import connectDB from "@/lib/mongodb";
 import { Payslip } from "@/modals/Payslip";
 import { Employee } from "@/modals/Employee";
-import { Attendance } from "@/modals/Attendance";
 import CompanyDetails from "@/modals/CompanyDetails";
 import { getSessionUser } from "@/lib/auth";
+import { getPayableHoursForMonth } from "@/lib/attendance-service";
 
 // TypeScript interfaces to ensure correct type resolution from lean queries
 interface IEmployee {
@@ -21,10 +21,6 @@ interface IEmployee {
 
 interface ICompanyDetails {
   standardWorkingHours?: number;
-}
-
-interface IAttendance {
-  workingHours?: number;
 }
 
 // Lean payslip doc; only employeeId is inspected directly, the rest is returned as-is
@@ -88,19 +84,9 @@ export async function GET(request: Request) {
         const monthIndex = months.indexOf(parts[0]);
         const year = parseInt(parts[1], 10);
         if (monthIndex !== -1 && !isNaN(year)) {
-          const yearStr = year.toString();
-          const monthStr = String(monthIndex + 1).padStart(2, "0");
-          const regexPattern = `^${yearStr}-${monthStr}`;
-
-          // Fetch attendance logs by employee's user link
           const empUserId = employee.userId ? employee.userId.toString() : "";
           if (empUserId) {
-            const attendances = (await Attendance.find({
-              userId: empUserId,
-              date: { $regex: regexPattern }
-            }).lean()) as IAttendance[];
-
-            totalWorkingHours = attendances.reduce((sum, att) => sum + (att.workingHours || 0), 0);
+            totalWorkingHours = await getPayableHoursForMonth(empUserId, year, monthIndex + 1);
           }
         }
       }

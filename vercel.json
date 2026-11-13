@@ -7,10 +7,6 @@
     {
       "path": "/api/cron/check-reviews",
       "schedule": "0 19 * * *"
-    },
-    {
-      "path": "/api/cron/leave-reset",
-      "schedule": "0 19 * * *"
     }
   ]
 }

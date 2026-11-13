@@ -5,15 +5,9 @@
 import mongoose from "mongoose";
 import dbConnect from "@/lib/mongodb";
 import Leave from "@/modals/LeaveRequest";
-import LeaveBalance from "@/modals/LeaveBalance";
 import { Employee } from "@/modals/Employee";
 import { ActivityLog } from "@/modals/ActivityLog";
 import { MONTHLY_FULL_DAYS, MONTHLY_HALF_DAYS, monthKey, monthUsage, type QuotaLeave } from "@/lib/monthly-leave";
-
-type TrackedLeaveType = "ANNUAL" | "SICK" | "CASUAL";
-
-type LeaveBalanceEntry = { allocated?: number; used?: number; remaining?: number };
-type LeanLeaveBalance = Partial<Record<TrackedLeaveType, LeaveBalanceEntry>>;
 
 interface LeanLeave {
   _id: unknown;
@@ -115,19 +109,13 @@ export async function listFormattedLeaves(userIds?: string[]): Promise<Formatted
     .filter((id) => mongoose.Types.ObjectId.isValid(id))
     .map((id) => new mongoose.Types.ObjectId(id));
 
-  const [employeeDocs, balanceDocs] = await Promise.all([
-    Employee.find({ userId: { $in: objectIdUserIds } })
-      .select("userId name designation profilePhotoUrl profilePhotoURL profilePicture image picture")
-      .lean<(LeanEmployeeInfo & { userId?: { toString(): string } })[]>(),
-    LeaveBalance.find({ userId: { $in: distinctUserIds } }).lean<
-      (LeanLeaveBalance & { userId?: string })[]
-    >(),
-  ]);
+  const employeeDocs = await Employee.find({ userId: { $in: objectIdUserIds } })
+    .select("userId name designation profilePhotoUrl profilePhotoURL profilePicture image picture")
+    .lean<(LeanEmployeeInfo & { userId?: { toString(): string } })[]>();
 
   const employeeByUserId = new Map(
     employeeDocs.map((doc) => [doc.userId ? doc.userId.toString() : "", doc])
   );
-  const balanceByUserId = new Map(balanceDocs.map((doc) => [String(doc.userId || ""), doc]));
 
   const quotaByUser = new Map<string, QuotaLeave[]>();
   for (const leave of leaves) {
@@ -144,7 +132,6 @@ export async function listFormattedLeaves(userIds?: string[]): Promise<Formatted
   return leaves.map((leave) => {
     const leaveUserId = String(leave.userId || "");
     const employeeDoc: LeanEmployeeInfo | null = employeeByUserId.get(leaveUserId) || null;
-    const balance: LeanLeaveBalance | null = balanceByUserId.get(leaveUserId) || null;
 
     const rawType = String(leave.type || "").toUpperCase();
     const rawStatus = String(leave.status || "PENDING").toUpperCase();
@@ -162,12 +149,11 @@ export async function listFormattedLeaves(userIds?: string[]): Promise<Formatted
     let usedLeaves = 0;
     let remainingLeaves = 0;
 
-    let matchedKey: TrackedLeaveType | null = null;
+    let matchedKey: "ANNUAL" | "SICK" | "CASUAL" | null = null;
     if (isAnnual) matchedKey = "ANNUAL";
     else if (isSick) matchedKey = "SICK";
     else if (isCasual) matchedKey = "CASUAL";
 
-    const trackedBalance = matchedKey && balance ? balance[matchedKey] : undefined;
     if (rawType === "HALF") {
       totalLeaves = MONTHLY_HALF_DAYS;
       usedLeaves = usage?.half || 0;
@@ -175,10 +161,6 @@ export async function listFormattedLeaves(userIds?: string[]): Promise<Formatted
     } else if (rawType === "FULL" || rawType === "URGENT") {
       totalLeaves = MONTHLY_FULL_DAYS;
       usedLeaves = usage?.full || 0;
-      remainingLeaves = Math.max(0, totalLeaves - usedLeaves);
-    } else if (trackedBalance) {
-      totalLeaves = Number(trackedBalance.allocated ?? 15);
-      usedLeaves = Number(trackedBalance.used ?? 0);
       remainingLeaves = Math.max(0, totalLeaves - usedLeaves);
     }
 
@@ -252,12 +234,8 @@ export type LeaveDeleteResult =
   | { ok: false; status: number; error: string };
 
 /**
- * Permanently deletes a leave request and refunds the employee's balance.
- * Used by admins to remove test/mistaken leaves so the used-days count is
- * restored (e.g. an approved leave the employee never actually took).
- *
- * Refund rules mirror the reject flow: REJECTED leaves were already refunded
- * and UNPAID leaves never consume tracked balance, so neither refunds again.
+ * Deletes one leave request. The leave document is removed only when an admin
+ * or reviewer chooses delete. Attendance, employees, and other leave rows stay.
  */
 export async function deleteLeaveRequest(id: string): Promise<LeaveDeleteResult> {
   await dbConnect();
@@ -271,35 +249,7 @@ export async function deleteLeaveRequest(id: string): Promise<LeaveDeleteResult>
     return { ok: false, status: 404, error: "Leave request not found." };
   }
 
-  const currentStatus = String(leaveRequest.status).toUpperCase();
-  const leaveType = String(leaveRequest.type).toUpperCase();
   const days = Number(leaveRequest.days || 0);
-  let refundedDays = 0;
-  const legacyType = leaveType === "ANNUAL" || leaveType === "SICK" || leaveType === "CASUAL";
-
-  if (legacyType && currentStatus !== "REJECTED") {
-    const balanceDoc = await LeaveBalance.findOne({ userId: leaveRequest.userId });
-    const balance = balanceDoc as LeanLeaveBalance | null;
-
-    const matchedKey: TrackedLeaveType = leaveType.includes("ANNUAL")
-      ? "ANNUAL"
-      : leaveType.includes("SICK")
-        ? "SICK"
-        : "CASUAL";
-
-    const balanceEntry = balance ? balance[matchedKey] : undefined;
-    if (balanceEntry && balanceDoc) {
-      const currentUsed = Number(balanceEntry.used || 0);
-      balanceEntry.used = Math.max(0, currentUsed - days);
-      refundedDays = currentUsed - Number(balanceEntry.used);
-
-      const allocated = Number(balanceEntry.allocated ?? 0);
-      balanceEntry.remaining = Math.max(0, allocated - balanceEntry.used);
-
-      balanceDoc.markModified(matchedKey);
-      await balanceDoc.save();
-    }
-  }
 
   await Leave.findByIdAndDelete(id);
 
@@ -308,17 +258,15 @@ export async function deleteLeaveRequest(id: string): Promise<LeaveDeleteResult>
     activityType: "LEAVE_DELETED",
     date: formatDateString(new Date()),
     timestamp: new Date(),
-    description: `Leave request for ${days} day(s) of ${leaveRequest.type} was deleted by admin${
-      refundedDays > 0 ? ` (${refundedDays} day(s) restored to balance)` : ""
-    }.`,
+    description: `Leave request for ${days} day(s) of ${leaveRequest.type} was deleted by admin.`,
   });
 
-  return { ok: true, id: String(leaveRequest._id), refundedDays };
+  return { ok: true, id: String(leaveRequest._id), refundedDays: 0 };
 }
 
 /**
- * Approves or rejects a leave request (includes balance refund on reject).
- * decidedByNote is appended to the activity log, e.g. "by department head Ali".
+ * Approves or rejects a leave request.
+ * decidedByNote is appended to the activity log, e.g. "by Admin".
  */
 export async function decideLeaveRequest(
   id: string,
@@ -338,8 +286,6 @@ export async function decideLeaveRequest(
     return { ok: false, status: 404, error: "Leave request not found." };
   }
 
-  const currentStatus = String(leaveRequest.status).toUpperCase();
-  const leaveType = String(leaveRequest.type).toUpperCase();
   const noteSuffix = decidedByNote ? ` ${decidedByNote}` : "";
 
   if (targetAction === "APPROVE") {
@@ -354,31 +300,6 @@ export async function decideLeaveRequest(
       description: `Leave request for ${leaveRequest.days} day(s) of ${leaveRequest.type} was Approved${noteSuffix}.`,
     });
   } else if (targetAction === "REJECT") {
-    // Prevents "UNPAID" leaves (or variations like "UNPAID LEAVE") from corrupting and refunding casual leaves
-    if (leaveType === "ANNUAL" || leaveType === "SICK" || leaveType === "CASUAL") {
-    if (currentStatus !== "REJECTED" && !leaveType.includes("UNPAID")) {
-      const balanceDoc = await LeaveBalance.findOne({ userId: leaveRequest.userId });
-      const balance = balanceDoc as LeanLeaveBalance | null;
-
-      const matchedKey: TrackedLeaveType = leaveType.includes("ANNUAL")
-        ? "ANNUAL"
-        : leaveType.includes("SICK")
-          ? "SICK"
-          : "CASUAL";
-
-      const balanceEntry = balance ? balance[matchedKey] : undefined;
-      if (balanceEntry && balanceDoc) {
-        const currentUsed = Number(balanceEntry.used || 0);
-        balanceEntry.used = Math.max(0, currentUsed - Number(leaveRequest.days || 0));
-
-        const allocated = Number(balanceEntry.allocated ?? 0);
-        balanceEntry.remaining = Math.max(0, allocated - balanceEntry.used);
-
-        balanceDoc.markModified(matchedKey);
-        await balanceDoc.save();
-      }
-    }
-    }
     leaveRequest.status = "REJECTED";
     await leaveRequest.save();
 

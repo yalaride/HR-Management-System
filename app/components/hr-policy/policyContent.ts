@@ -11,7 +11,7 @@ export const HR_POLICY_SECTIONS: PolicySection[] = [
     number: 1,
     title: "Purpose",
     paragraphs: [
-      "This policy is designed to clearly explain the probation period, annual leave, emergency leave, and attendance requirements for all employees of SYNC UP.",
+      "This policy is designed to clearly explain the probation period, monthly leave, and attendance requirements for all employees of SYNC UP.",
     ],
   },
   {
@@ -19,34 +19,34 @@ export const HR_POLICY_SECTIONS: PolicySection[] = [
     title: "Probation Period",
     paragraphs: [
       "All newly hired employees will have a probation period of three (3) months from their joining date.",
-      "During the probation period, the annual leave policy will not apply.",
+      "During the probation period, the monthly leave allowance does not apply.",
       "After completion of the three-month probation period, management will review the employee’s performance, attendance, punctuality, and overall conduct. Based on this review, management will decide whether to confirm the employee, extend the probation period, or discontinue the employment.",
     ],
   },
   {
     number: 3,
-    title: "Annual Leave",
+    title: "Monthly Leave",
     paragraphs: [
-      "An employee who successfully completes the three-month probation period will be entitled to thirty (30) leave days per calendar year.",
-      "The annual leave entitlement will become applicable after successful completion of the probation period.",
-      "Employees are expected to plan their leave responsibly and obtain approval before taking leave.",
+      "A Permanent or Contract employee receives 2 full days and 1 half day in each calendar month. That is 20 hours.",
+      "Unused leave stays in that month. It is not added to the next month.",
+      "An employee applies at least 2 days before the leave starts. Sunday is not a leave day.",
+      "Urgent leave and extra paid leave are set by Admin.",
     ],
   },
   {
     number: 4,
-    title: "Carry Forward of Unused Leave",
+    title: "No Carry Forward",
     paragraphs: [
-      "Any unused leave remaining at the end of the year will not automatically be carried forward.",
-      "The decision to carry forward unused leave to the following year will be made subject to approval from the CEO.",
+      "Leave that is not used by the end of the month is not carried into the next month.",
     ],
   },
   {
     number: 5,
-    title: "Sick and Emergency Leave",
+    title: "Sickness and Emergency",
     paragraphs: [
-      "In case of sickness or a genuine emergency, the employee must inform their reporting manager as soon as possible.",
-      "The reporting manager will then inform the concerned person so that the leave can be properly recorded and maintained in the company’s attendance and leave records.",
-      "Employees should provide reasonable information regarding the emergency or sickness when required by management.",
+      "Sickness and emergencies use the same monthly leave. There is no separate sick or casual balance.",
+      "The employee must inform their reporting manager as soon as possible.",
+      "A date inside the 2-day notice window can be set by Admin as urgent leave.",
     ],
   },
   {
@@ -73,7 +73,7 @@ export const HR_POLICY_SECTIONS: PolicySection[] = [
     title: "Management Rights",
     paragraphs: [
       "SYNC UP reserves the right to review, amend, or update this policy based on business requirements and applicable laws.",
-      "Management will have the final authority regarding probation confirmation, leave approval, carry-forward of unused leave, and exceptional circumstances.",
+      "Management will have the final authority regarding probation confirmation, leave approval, and exceptional circumstances.",
     ],
   },
 ];

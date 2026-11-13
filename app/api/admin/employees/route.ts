@@ -7,7 +7,6 @@ import bcrypt from "bcryptjs";
 import { sendWelcomeEmail } from "@/lib/email/welcome-email";
 import { getAdminUser } from "@/lib/auth";
 import { syncDueReviews } from "@/lib/cron/sync-reviews";
-import { applyEmployeeLeaveProration } from "@/lib/leave-proration";
 import { effectiveEmploymentPeriod } from "@/lib/employment-period";
 import { normalizeDeviceUserNo } from "@/lib/device-user-no";
 import { getProfileCompletion } from "@/lib/profile-completion";
@@ -319,19 +318,6 @@ export async function POST(request: Request) {
       extensions: [],
       ...(parsedDeviceUserNo.value ? { deviceUserNo: parsedDeviceUserNo.value } : {}),
     });
-
-    // Seed all leave balances from the joining month. Non-permanent employees
-    // accumulate the balance but cannot use it until they become Permanent.
-    if (newEmployee.userId && newEmployee.joinDate) {
-      try {
-        await applyEmployeeLeaveProration(
-          newUser._id.toString(),
-          new Date(newEmployee.joinDate)
-        );
-      } catch (prorationError) {
-        console.error("Leave balance initialization error on create:", prorationError);
-      }
-    }
 
     // 5. Send Welcome Email
     const emailResult = await sendWelcomeEmail(name, normalizedEmail, password);

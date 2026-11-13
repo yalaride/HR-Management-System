@@ -6,7 +6,7 @@ import { AlertCircle, CheckCircle2, Plus } from "lucide-react";
 import LeaveHistoryTable, { LeaveRecord } from "@/app/components/employee/LeaveHistoryTable";
 import { LeaveDetailsModal } from "@/app/components/admin/leaves/LeaveDetailsModal";
 import ApplyLeaveModal from "@/app/components/employee/ApplyLeaveModal";
-import { LeaveRequest, LeaveBalances } from "@/lib/types";
+import { LeaveRequest } from "@/lib/types";
 
 // Standard SWR fetcher
 const fetcher = async (url: string) => {
@@ -18,13 +18,17 @@ const fetcher = async (url: string) => {
   return res.json();
 };
 
-// Normalize any leave type format (e.g. "Annual Leave" -> "ANNUAL")
-function normalizeLeaveType(type?: string): "ANNUAL" | "SICK" | "CASUAL" | "OTHER" {
+function leaveTitle(type?: string): LeaveRequest["type"] {
   const upper = String(type || "").trim().toUpperCase();
-  if (upper.includes("ANNUAL")) return "ANNUAL";
-  if (upper.includes("SICK")) return "SICK";
-  if (upper.includes("CASUAL")) return "CASUAL";
-  return "OTHER";
+  if (upper.includes("HALF")) return "Half day";
+  if (upper.includes("EXTRA")) return "Extra paid leave";
+  if (upper.includes("URGENT")) return "Urgent leave";
+  if (upper.includes("FULL")) return "Full day";
+  if (upper.includes("ANNUAL")) return "Annual Leave";
+  if (upper.includes("SICK")) return "Sick Leave";
+  if (upper.includes("CASUAL")) return "Casual Leave";
+  if (upper.includes("UNPAID")) return "Unpaid Leave";
+  return "Other Leave";
 }
 
 export default function EmployeeLeavesPage() {
@@ -45,21 +49,6 @@ export default function EmployeeLeavesPage() {
     return Array.isArray(data?.leaves) ? data.leaves : [];
   }, [data]);
 
-  const balances = useMemo<LeaveBalances | null>(() => {
-    if (data && !Array.isArray(data) && data.balances) return data.balances;
-    return null;
-  }, [data]);
-
-  // Overall totals across all categories
-  const summary = useMemo(() => {
-    if (!balances) return { allocated: 0, used: 0, remaining: 0 };
-    return {
-      allocated: (balances.ANNUAL?.allocated ?? 0) + (balances.SICK?.allocated ?? 0) + (balances.CASUAL?.allocated ?? 0),
-      used: (balances.ANNUAL?.used ?? 0) + (balances.SICK?.used ?? 0) + (balances.CASUAL?.used ?? 0),
-      remaining: (balances.ANNUAL?.remaining ?? 0) + (balances.SICK?.remaining ?? 0) + (balances.CASUAL?.remaining ?? 0),
-    };
-  }, [balances]);
-
   const canRequestLeave = !loading && !Array.isArray(data) && data?.canRequestLeave !== false;
   const displayMessage =
     message ||
@@ -73,16 +62,10 @@ export default function EmployeeLeavesPage() {
         : null);
 
   const handleRowClick = (record: LeaveRecord) => {
-    const normalizedKey = normalizeLeaveType(record.type);
-
-    const mappedType: LeaveRequest["type"] =
-      normalizedKey === "ANNUAL"
-        ? "Annual Leave"
-        : normalizedKey === "SICK"
-          ? "Sick Leave"
-          : normalizedKey === "CASUAL"
-            ? "Casual Leave"
-            : "Other Leave";
+    const mappedType = leaveTitle(record.type);
+    const upper = String(record.type || "").toUpperCase();
+    const monthly = upper.includes("FULL") || upper.includes("HALF") || upper.includes("URGENT") || upper.includes("EXTRA");
+    const quota = !Array.isArray(data) ? data?.quota?.currentMonth : undefined;
 
     const mappedStatus: LeaveRequest["status"] =
       record.status?.toUpperCase() === "APPROVED"
@@ -90,9 +73,6 @@ export default function EmployeeLeavesPage() {
         : record.status?.toUpperCase() === "REJECTED"
           ? "Rejected"
           : "Pending";
-
-    // Lookup balance safely
-    const targetBalance = normalizedKey !== "OTHER" && balances ? balances[normalizedKey] : null;
 
     const mapped: LeaveRequest = {
       id: record.id,
@@ -105,9 +85,15 @@ export default function EmployeeLeavesPage() {
       days: record.days,
       reason: record.reason,
       status: mappedStatus,
-      totalLeaves: targetBalance?.allocated ?? 0,
-      usedLeaves: targetBalance?.used ?? 0,
-      remainingLeaves: targetBalance?.remaining ?? 0,
+      ...(monthly && quota
+        ? {
+            monthLabel: quota.label,
+            fullUsed: quota.fullUsed,
+            fullRemaining: quota.fullRemaining,
+            halfUsed: quota.halfUsed,
+            halfRemaining: quota.halfRemaining,
+          }
+        : {}),
     };
     setSelectedLeave(mapped);
   };
@@ -252,58 +238,6 @@ export default function EmployeeLeavesPage() {
               </p>
             </div>
           </div>
-        </div>
-      ) : balances ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-          {/* Total Overall Leaves Card */}
-          <div className="bg-brand-accent/5 border border-brand-accent/20 rounded-2xl p-5 shadow-xs flex flex-col justify-between">
-            <h3 className="text-xs font-bold text-brand-accent uppercase tracking-widest mb-3">
-              Total Leaves
-            </h3>
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs">
-                <span className="text-content-muted font-medium">Allocated:</span>
-                <span className="font-bold text-content-main">{summary.allocated}</span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-content-muted font-medium">Used:</span>
-                <span className="font-bold text-amber-600">{summary.used}</span>
-              </div>
-              <div className="flex justify-between text-xs border-t border-line-subtle pt-2 mt-1">
-                <span className="text-content-muted font-medium">Remaining:</span>
-                <span className="font-bold text-emerald-600">{summary.remaining}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Categorized Cards */}
-          {(["ANNUAL", "SICK", "CASUAL"] as const).map((leaveType) => {
-            const balance = balances[leaveType];
-            return (
-              <div
-                key={leaveType}
-                className="bg-surface-card border border-line-subtle rounded-2xl p-5 shadow-xs flex flex-col justify-between"
-              >
-                <h3 className="text-xs font-bold text-content-secondary uppercase tracking-widest mb-3">
-                  {leaveType === "ANNUAL" ? "Annual Leave" : leaveType === "SICK" ? "Sick Leave" : "Casual Leave"}
-                </h3>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-content-muted font-medium">Allocated:</span>
-                    <span className="font-bold text-content-main">{balance?.allocated ?? 0}</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-content-muted font-medium">Used:</span>
-                    <span className="font-bold text-amber-600">{balance?.used ?? 0}</span>
-                  </div>
-                  <div className="flex justify-between text-xs border-t border-line-subtle pt-2 mt-1">
-                    <span className="text-content-muted font-medium">Remaining:</span>
-                    <span className="font-bold text-emerald-600">{balance?.remaining ?? 0}</span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
         </div>
       ) : null}
 

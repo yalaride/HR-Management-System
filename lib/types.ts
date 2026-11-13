@@ -22,17 +22,6 @@ export interface LeaveRequest {
   halfRemaining?: number;
 }
 
-export interface LeaveBalance {
-  allocated: number;
-  used: number;
-  remaining: number;
-}
-
-export interface LeaveBalances {
-  ANNUAL: LeaveBalance;
-  SICK: LeaveBalance;
-  CASUAL: LeaveBalance;
-}
 export interface EmployeeBirthday {
   id: string;
   name: string;

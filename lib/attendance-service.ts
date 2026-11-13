@@ -280,13 +280,8 @@ export async function getUserAttendanceHistory(userId: string, period: string | 
 
   const logs = await Attendance.find(query).sort({ date: -1 }).lean();
 
-  const totalDays = logs.length;
   const onTimeDays = logs.filter((l) => l.status === "On Time").length;
   const lateDays = logs.filter((l) => l.status === "Late").length;
-  const absentDays = logs.filter((l) => l.status === "Absent").length;
-
-  const presenceCount = onTimeDays + lateDays;
-  const attendanceRate = totalDays > 0 ? Math.round((presenceCount / totalDays) * 100) : 0;
 
   const targetMonth =
     period === "this-month"
@@ -393,12 +388,17 @@ export async function getUserAttendanceHistory(userId: string, period: string | 
       department: employee?.department || "",
     },
     stats: {
-      totalDays,
+      totalDays: report.summary.workingDays,
       onTimeDays,
       lateDays,
       absentDays: report.summary.absentDays,
       totalHours: report.summary.totalHours,
-      attendanceRate,
+      attendanceRate:
+        report.summary.workingDays > 0
+          ? Math.round(
+              ((report.summary.workingDays - report.summary.absentDays) / report.summary.workingDays) * 100
+            )
+          : 0,
     },
   };
 }
@@ -487,6 +487,61 @@ export async function upsertAttendanceRecord(
   await syncMonthlyAttendanceAggregates(userId, year, month);
 
   return { ok: true, record: updatedRecord };
+}
+
+/** Payable hours for one calendar month, using the same settlement as the attendance PDF. */
+export async function getPayableHoursForMonth(userId: string, year: number, month: number): Promise<number> {
+  await dbConnect();
+  const todayStr = getKarachiDateString();
+  const monthStr = String(month).padStart(2, "0");
+  const from = `${year}-${monthStr}-01`;
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  let to = `${year}-${monthStr}-${String(lastDay).padStart(2, "0")}`;
+  if (to > todayStr) to = todayStr;
+  if (from > to) return 0;
+
+  const [logs, holidays, leaves, omissions, settings] = await Promise.all([
+    Attendance.find({ userId, date: { $gte: from, $lte: to } }).lean(),
+    Holiday.find({ startDate: { $lte: to }, endDate: { $gte: from } })
+      .select("title startDate endDate")
+      .lean<{ title: string; startDate: string; endDate: string }[]>(),
+    Leave.find({
+      userId,
+      status: "APPROVED",
+      startDate: { $lte: new Date(`${to}T23:59:59+05:00`) },
+      endDate: { $gte: new Date(`${from}T00:00:00+05:00`) },
+    })
+      .select("type status startDate endDate")
+      .lean<{ type: string; status: string; startDate: Date; endDate: Date }[]>(),
+    AttendanceOmission.find({ userId, date: { $gte: from, $lte: to } }).select("date").lean<{ date: string }[]>(),
+    getActiveSettings(),
+  ]);
+
+  const cleanedLogs = await stripInvalidCheckouts(logs);
+  const report = buildAttendanceReport({
+    from,
+    to,
+    today: todayStr,
+    shiftStart: settings.shiftStart || "09:00",
+    shiftEnd: settings.shiftEnd || "17:00",
+    gracePeriod: typeof settings.gracePeriod === "number" ? settings.gracePeriod : 15,
+    punches: cleanedLogs.map((log) => ({
+      date: log.date,
+      checkIn: log.checkIn,
+      checkOut: log.checkOut,
+      status: log.status,
+    })),
+    leaves: leaves.map((leave) => ({
+      type: leave.type,
+      status: leave.status,
+      startDate: new Date(leave.startDate).toISOString().slice(0, 10),
+      endDate: new Date(leave.endDate).toISOString().slice(0, 10),
+    })),
+    holidays,
+    omittedDates: omissions.map((item) => item.date),
+  });
+
+  return report.summary.totalHours;
 }
 
 export type DeleteAttendanceResult =
@@ -642,7 +697,7 @@ type PunchLog = {
 };
 
 /** Drops a checkout that has not happened yet, or that is earlier than check-in. */
-async function stripInvalidCheckouts<T extends PunchLog>(logs: T[], now = new Date()): Promise<T[]> {
+export async function stripInvalidCheckouts<T extends PunchLog>(logs: T[], now = new Date()): Promise<T[]> {
   const repairs: Promise<unknown>[] = [];
   const months = new Set<string>();
 

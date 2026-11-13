@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { Attendance } from "@/modals/Attendance";
 import { MonthlyAttendance } from "@/modals/MonthlyAttendance";
 import CompanyDetails from "@/modals/CompanyDetails";
+import { stripInvalidCheckouts } from "@/lib/attendance-service";
 
 const TIMEZONE = "Asia/Karachi"; 
 
@@ -119,12 +120,10 @@ export async function GET() {
       { $set: { isLocked: true } }
     );
 
-    const todayRecord = await Attendance.findOne({ userId, date: todayDateStr }).lean();
-
-    const history = await Attendance.find({ userId })
-      .sort({ date: -1 })
-      .limit(30)
-      .lean();
+    const history = await stripInvalidCheckouts(
+      await Attendance.find({ userId }).sort({ date: -1 }).limit(30).lean()
+    );
+    const todayRecord = history.find((row) => row.date === todayDateStr) ?? null;
 
     const monthlyRecord = (await MonthlyAttendance.findOne({
       userId,

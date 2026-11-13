@@ -41,7 +41,12 @@ const getInitialFormData = () => ({
   designation: "",
   deviceUserNo: "",
   salary: "" as string | number,
-  joinDate: new Date().toISOString().split("T")[0],
+  joinDate: new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Karachi",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date()),
   status: "Active",
   employmentType: "Probation",
   durationMonths: 3,

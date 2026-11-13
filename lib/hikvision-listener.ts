@@ -154,7 +154,12 @@ function parseCentralEvents(json: unknown): ParsedHikvisionEvent[] | null {
       readJsonString(record.personCode);
     const dateTime = readJsonString(record.happenTime) || readJsonString(record.sendTime);
     const eventType = readJsonString(record.eventType);
-    return classifyPunch(employeeNo, dateTime, eventType, null);
+    const subEventType =
+      readJsonString(data.subEventType) ||
+      readJsonString(data.minor) ||
+      readJsonString(record.subEventType) ||
+      readJsonString(record.minor);
+    return classifyPunch(employeeNo, dateTime, eventType, subEventType);
   });
 }
 

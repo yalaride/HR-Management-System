@@ -170,6 +170,25 @@ function leaveCovers(leave: ReportLeave, date: string): boolean {
   return leave.status === "APPROVED" && leave.startDate <= date && leave.endDate >= date;
 }
 
+function completedShift(
+  punch: ReportPunch | undefined,
+  now: Date
+): { checkIn: Date; checkOut: Date; worked: number } | null {
+  const checkInDate = punch?.checkIn ? new Date(punch.checkIn) : null;
+  const checkOutDate = punch?.checkOut ? new Date(punch.checkOut) : null;
+  const checkIn = checkInDate && !isFutureFingerprint(checkInDate, now) ? checkInDate : null;
+  const checkOut =
+    checkOutDate && checkIn && !isFutureFingerprint(checkOutDate, now) && checkOutDate.getTime() > checkIn.getTime()
+      ? checkOutDate
+      : null;
+  if (!checkIn || !checkOut) return null;
+  return {
+    checkIn,
+    checkOut,
+    worked: Math.max(0, Math.floor((checkOut.getTime() - checkIn.getTime()) / 60000)),
+  };
+}
+
 function isPaidLeave(type: string): boolean {
   return type.toUpperCase() !== "UNPAID";
 }
@@ -207,22 +226,29 @@ export function buildAttendanceReport(input: {
     const holiday = input.holidays.find((item) => item.startDate <= date && item.endDate >= date);
     const leave = input.leaves.find((item) => leaveCovers(item, date));
     const punch = punchByDate.get(date);
-    if (date.startsWith("2026-10") && !punch?.checkIn && !punch?.checkOut) continue;
+    const now = input.now ?? new Date();
+    const completed = completedShift(punch, now);
+    if (date.startsWith("2026-10") && !punch?.checkIn && !punch?.checkOut && !holiday && !leave) continue;
 
     if (holiday) {
+      const extra = completed ? Math.max(0, completed.worked - REQUIRED_DAY_MINUTES) : 0;
       holidayDays += 1;
       paidMinutes += REQUIRED_DAY_MINUTES;
       days.push({
         date,
         weekday,
-        checkIn: "—",
-        checkOut: "—",
+        checkIn: completed ? clock(completed.checkIn) : "—",
+        checkOut: completed ? clock(completed.checkOut) : "—",
         arrival: "Holiday",
-        worked: "—",
+        worked: completed ? formatMinutes(Math.min(completed.worked, REQUIRED_DAY_MINUTES)) : "—",
         short: "—",
         paid: "8 hrs 0 mins",
-        detail: `Company holiday · ${holiday.title}`,
-        ...blankHours(),
+        detail: extra
+          ? `Company holiday · ${holiday.title}. Extra ${formatMinutes(extra)}`
+          : `Company holiday · ${holiday.title}`,
+        extra: extra ? formatMinutes(extra) : "—",
+        rawExtraMinutes: extra,
+        rawShortMinutes: 0,
       });
       continue;
     }
@@ -261,7 +287,7 @@ export function buildAttendanceReport(input: {
       continue;
     }
 
-    if (leave && isPaidLeave(leave.type)) {
+    if (leave && isPaidLeave(leave.type) && !completed) {
       leaveDays += 1;
       const countsTowardAllowance = leave.type.toUpperCase() !== "EXTRA_PAID";
       if (countsTowardAllowance) allowanceUsedMinutes += REQUIRED_DAY_MINUTES;
@@ -281,7 +307,7 @@ export function buildAttendanceReport(input: {
       continue;
     }
 
-    if (leave && !isPaidLeave(leave.type)) {
+    if (leave && !isPaidLeave(leave.type) && !completed) {
       absentDays += 1;
       days.push({
         date,
@@ -300,7 +326,6 @@ export function buildAttendanceReport(input: {
       continue;
     }
 
-    const now = input.now ?? new Date();
     const checkInDate = punch?.checkIn ? new Date(punch.checkIn) : null;
     const checkOutDate = punch?.checkOut ? new Date(punch.checkOut) : null;
     const checkIn =

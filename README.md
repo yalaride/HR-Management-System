@@ -1,51 +1,45 @@
 # HR Management System
 
-A production-ready **Human Resources portal** for small and mid-size teams.  
-Admins manage people, attendance, leave, and payroll. Employees self-serve check-in, leave requests, payslips, and profile updates — all behind role-based authentication.
+Production HR portal for Sync Up. Admins manage people, attendance, leave, and payslips. Employees see their fingerprint punches, request monthly leave, and download their own payslips. Access is split by role.
 
----
+## What it does
 
-## What this project solves
+| Area | Behavior |
+|------|----------|
+| People | Employee directory. Inactive and Terminated employees stay out of the daily sheet. |
+| Attendance | Fingerprint punches from the office Hikvision device. Earliest punch of the Karachi day is check-in. A later punch becomes check-out only when it is at least 15 minutes after check-in. |
+| Leave | Each month: 2 full days and 1 half day (20 hours). Unused leave does not move to the next month. Employees apply at least 2 days ahead. Sunday is not a leave day. |
+| Urgent and extra paid leave | Set by an admin, or by an employee on the audit-log allowlist. These are not self-serve. |
+| Payslips | Generated from the same payable hours as the month attendance PDF: extra hours cover short days first, then the remaining monthly leave hours. |
+| Birthdays and reviews | Two daily Vercel crons email birthdays and mark internship or probation reviews due. |
+| Access | NextAuth JWT. Pages are split into `/admin` and `/employee`. |
 
-| Problem | How this app helps |
-|---------|-------------------|
-| Scattered employee records | Central employee directory with soft-delete |
-| Manual attendance tracking | Web check-in / check-out + shift rules + auto check-out cron |
-| Leave chaos | Policies, balances, and approval workflow |
-| Payslip emails / PDFs | Generate, version, and download payslips |
-| Forgotten birthdays | Daily cron emails via Resend |
-| Weak access control | NextAuth JWT + admin / employee roles |
-| No team-level delegation | Department Head role: scoped leave approvals + attendance edits |
-| Slow page loads | Batched DB queries, indexes, and SWR client-side caching |
-
----
+Department heads approve leave for their own department. A department head's own leave, and any other head's leave, is decided by an admin or the allowlisted reviewer. Heads can view team attendance. They cannot change check-in or check-out.
 
 ## System overview
 
 ```mermaid
 flowchart TB
   subgraph Clients
-    A[Admin Portal]
-    E[Employee Portal]
+    A[Admin pages]
+    E[Employee pages]
   end
 
   subgraph Next.js App Router
-    P[proxy.ts<br/>page auth]
-    API[API Routes<br/>role-guarded]
-    AUTH[NextAuth<br/>credentials + JWT]
+    P[proxy.ts]
+    API[API routes]
+    AUTH[NextAuth credentials]
   end
 
-  subgraph Data and services
-    DB[(MongoDB Atlas)]
-    CL[Cloudinary<br/>profile photos]
-    RS[Resend<br/>transactional email]
+  subgraph Office
+    DEV[Hikvision device]
+    BR[PowerShell bridge on the office PC]
   end
 
-  subgraph Vercel Cron
-    C1["/api/cron/birthdays<br/>daily 19:00 UTC / 00:00 PKT"]
-    C2["/api/cron/employee-attendance<br/>daily 19:00 UTC / 00:00 PKT"]
-    C3["/api/cron/check-reviews<br/>daily 19:00 UTC / 00:00 PKT"]
-    C4["/api/cron/leave-reset<br/>daily 19:00 UTC / 00:00 PKT"]
+  subgraph Services
+    DB[(MongoDB)]
+    CL[Cloudinary]
+    RS[Resend]
   end
 
   A --> P --> API
@@ -54,279 +48,138 @@ flowchart TB
   API --> DB
   API --> CL
   API --> RS
-  C1 --> DB
-  C1 --> RS
-  C2 --> DB
+  DEV --> BR --> API
 ```
-
-### Role flows
 
 ```mermaid
 flowchart LR
-  L[Login] --> R{Role?}
+  L[Login] --> R{Role}
   R -->|admin| AD[Admin dashboard]
   R -->|employee| ED[Employee dashboard]
-
   AD --> EM[Employees]
-  AD --> AT[Attendance]
-  AD --> LV[Leave approvals]
+  AD --> AT[Attendance and month PDF]
+  AD --> LV[Leave]
   AD --> PS[Payslips]
-  AD --> BD[Birthdays]
-  AD --> ST[Settings]
-
-  ED --> CI[Check-in / Check-out]
-  ED --> LR[Leave requests]
+  ED --> FP[Fingerprint attendance]
+  ED --> LR[Monthly leave]
   ED --> MY[My payslips]
-  ED --> PF[Profile + photo]
-
-  ED -->|if department head| TH[Team attendance + team leaves]
+  ED -->|department head| TH[Team attendance and team leaves]
 ```
 
----
+## Attendance
 
-## Features
+- Timezone is Asia/Karachi.
+- The device cannot call Vercel. `scripts/hikvision-bridge.ps1` runs on the office PC, reads fingerprint events, and posts them to `/api/hikvision/events`.
+- Only fingerprint success events become punches. Face, card, and door events do not.
+- Admin, and an allowlisted editor, can set or correct a day's times. Deleting an attendance day is limited to the allowlist.
+- The month PDF shows attended, extra, paid, short, and payable hours. Extra minutes fill short days first. What remains can be covered by the unused part of the 20-hour monthly leave. Approved full, half, and urgent leave already use part of those 20 hours. Extra paid leave and holidays do not.
+- A worked day on approved full leave counts the actual hours. A leave day with no completed punch stays paid leave.
 
-### Admin
-- Employee CRUD (soft-delete → `Inactive`, login user removed on delete)
-- Attendance timesheets, manual / retro edits, monthly locking
-- Shift rules: start/end, grace period, display windows, auto check-out buffer
-- Leave policies (global + per employee) and approvals
-- Payslip generation with PDF download
-- Birthday tracker + automated emails
-- Activity log and company settings
+## Leave
 
-### Employee
-- Check-in / check-out (Asia/Karachi timezone)
-- Attendance history and monthly stats
-- Leave requests with live balances
-- Own payslips only
-- Profile + Cloudinary photo upload (server-side)
-- Birthday greeting on dashboard
-
-### Department Head (assigned per department by admin)
-- Approve / reject leave requests for their own department members
-- View and correct team check-in / check-out times
-- Cannot see payslips, cannot change leave policies, cannot act on their own records
-- Assignment is atomic: replacing a head instantly demotes the old one to a
-  regular employee and grants the new one full head access
-- Head status is verified **live against the database** on every request —
-  never trusted from the JWT
-
-### Auth and security
-- NextAuth credentials + JWT
-- Roles: `admin` | `employee` (+ database-verified department-head capability)
-- `tokenVersion` for global session invalidation
-- Password reset via Resend
-- Admin APIs guarded with `getAdminUser()`
-- Cron routes require `Authorization: Bearer $CRON_SECRET`
-
-### Performance
-- **Batched queries** — leave listings resolve employees + balances in 3
-  queries total (previously 2 queries *per* leave row)
-- **Parallel reads** — dashboard metrics fetched with a single `Promise.all`
-- **Lean + select** — list endpoints return only rendered fields
-- **Compound indexes** — `Leave(status, createdAt)`, `Employee(department, status)`,
-  `ActivityLog(createdAt)`
-- **SWR client cache** — every page renders instantly from cache on revisit and
-  revalidates in the background; mutations update the cache optimistically
-- **Bulk writes** — auto check-out uses one `bulkWrite` instead of per-record updates
-
----
+- Employee requests are Full day (1 or 2 working days) or Half day (one working day).
+- The start date must be at least two Karachi days ahead, and it cannot be a Sunday.
+- Pending and approved requests count against that month. Rejected requests do not.
+- A department head still approves teammates. Head leave is not approved by a head.
+- Older annual, sick, or casual rows can still appear in history under those names. New requests cannot use those types.
 
 ## Tech stack
 
 | Layer | Choice |
 |-------|--------|
-| Framework | Next.js 16 (App Router) + React 19 |
-| Language | TypeScript (strict) |
-| Database | MongoDB Atlas + Mongoose |
-| Auth | NextAuth v4 (JWT) |
+| App | Next.js 16 App Router, React 19, TypeScript |
+| Data | MongoDB and Mongoose |
+| Auth | NextAuth v4, credentials, JWT |
 | UI | Tailwind CSS v4 |
-| Data fetching | SWR (stale-while-revalidate cache) |
-| Media | Cloudinary |
+| Reads | SWR |
+| Writes | `fetch` |
+| PDF | jsPDF in the browser |
+| Photos | Cloudinary |
 | Email | Resend |
-| Hosting | Vercel (+ Cron) |
+| Host | Vercel |
 
----
+There is one app. Pages and API routes deploy together. Redux, Axios, and React Query are not used.
 
-## Project structure (high level)
+## Project structure
 
 ```
 app/
-  (admin)/admin/        # Admin UI pages (dashboard, employees, leaves, ...)
-  (employee)/employee/  # Employee UI pages (+ department/* for heads)
-  api/
-    admin/              # Admin-only REST handlers
-    employee/           # Employee self-service handlers
-    head/               # Department-head scoped handlers
-    auth/, settings/    # Auth + shared settings
-  components/
-    admin/              # Admin feature components
-    employee/           # Employee feature components
-    ui/                 # Shared primitives (FilterSelect, ...)
-lib/                    # Service layer + infrastructure
-  api-client.ts         # Shared SWR fetcher (typed errors)
-  attendance-service.ts # Attendance business logic (admin + head)
-  leave-service.ts      # Leave business logic (admin + head)
-  department-head.ts    # Head authorization + scoping helpers
-  auth.ts, mongodb.ts, cloudinary.ts, email/
-modals/                 # Mongoose models (indexes defined here)
-scripts/                # seed-admin, db:test, test:email
-proxy.ts                # Page-level route protection
-vercel.json             # Cron schedules
+  (admin)/admin/           Admin pages
+  (employee)/employee/     Employee pages, including department pages for heads
+  api/admin|employee|head  HTTP handlers
+  api/hikvision            Fingerprint listener
+  api/cron                 Birthdays and review checks
+  components/              UI
+lib/                       Attendance, leave, auth, email
+modals/                    Mongoose models
+scripts/                   Office fingerprint bridge
+proxy.ts                   Sends each role to its own pages
+vercel.json                Cron schedules
 ```
 
----
-
-## Quick start
-
-### 1. Install
+## Setup
 
 ```bash
 npm install
-```
-
-### 2. Environment
-
-```bash
 cp .env.example .env
+npm run dev
 ```
 
-Fill values from `.env.example`. Minimum for local run:
+Open `http://localhost:3000`.
 
 | Variable | Purpose |
 |----------|---------|
-| `MONGODB_URI` | Atlas connection string |
-| `NEXTAUTH_SECRET` | JWT signing (`openssl rand -base64 32`) |
-| `NEXTAUTH_URL` | `http://localhost:3000` locally |
-| `CRON_SECRET` | Protects cron endpoints |
-| `RESEND_API_KEY` / `RESEND_FROM_EMAIL` | Emails |
-| `CLOUDINARY_*` or `CLOUDINARY_URL` | Profile photos |
+| `MONGODB_URI` | MongoDB connection string |
+| `NEXTAUTH_SECRET` | JWT signing secret |
+| `NEXTAUTH_URL` | `http://localhost:3000` locally, the live URL in production |
+| `CRON_SECRET` | Required bearer token for cron routes |
+| `RESEND_API_KEY` and `RESEND_FROM_EMAIL` | Mail |
+| `CLOUDINARY_URL` or the three Cloudinary keys | Profile photos |
+| `HIKVISION_LISTENER_SECRET` | Secret in the fingerprint listener path |
+| `AUDIT_LOG_VIEWER_EMAILS` | Optional extra emails for activity logs, head-leave review, and granted leave |
 
-### 3. Seed first admin
-
-```bash
-# In .env (temporary):
-# SEED_ADMIN_EMAIL=admin@syncup.com
-# SEED_ADMIN_PASSWORD=YourSecurePassword
-
-npm run seed:admin
-
-# Then remove SEED_ADMIN_PASSWORD from .env
-```
-
-### 4. Run
-
-```bash
-npm run db:test    # optional: verify MongoDB
-npm run dev        # http://localhost:3000
-```
-
----
+The first admin is a user document with role `admin`. This repo does not ship a seed command.
 
 ## Scripts
 
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Development server |
+| Command | What it does |
+|---------|----------------|
+| `npm run dev` | Local server |
 | `npm run build` | Production build |
-| `npm start` | Serve production build |
+| `npm start` | Serve the production build |
 | `npm run lint` | ESLint |
-| `npm run db:test` | Test MongoDB connection |
-| `npm run seed:admin` | Create / update admin user |
-| `npm run test:email` | Send a Resend test email |
 
-```bash
-TEST_EMAIL=you@gmail.com npm run test:email
-```
+## Deploy
 
----
+1. Push to GitHub and import the project in Vercel.
+2. Set the environment variables above. `NEXTAUTH_URL` must be the live origin.
+3. Allow the Vercel network on MongoDB Atlas.
+4. Crons in `vercel.json` run at 19:00 UTC, which is 00:00 in Karachi:
+   - `/api/cron/birthdays`
+   - `/api/cron/check-reviews`
 
-## Deploy on Vercel
+Both cron routes reject calls that do not send `Authorization: Bearer <CRON_SECRET>`.
 
-```mermaid
-sequenceDiagram
-  participant Dev as Developer
-  participant GH as GitHub
-  participant V as Vercel
-  participant M as MongoDB Atlas
-  participant R as Resend / Cloudinary
+The office PC keeps its own copy of `scripts/hikvision-bridge.ps1`. A git push updates the HR app. It does not update the script already sitting on that PC.
 
-  Dev->>GH: Push main
-  V->>GH: Import / redeploy
-  Dev->>V: Set env vars
-  Dev->>M: Network Access 0.0.0.0/0 + backups
-  V->>M: App queries
-  V->>R: Photos + emails
-  V->>V: Cron with CRON_SECRET
-```
+## Security
 
-### Steps
+- Do not commit `.env` or `scripts/hikvision-bridge.config.ps1`.
+- Cron routes stay locked unless `CRON_SECRET` matches.
+- The fingerprint listener stays locked unless the path secret matches `HIKVISION_LISTENER_SECRET`.
+- An employee can open only their own payslips, leave, and attendance. An admin cannot open `/employee` pages, and an employee cannot open `/admin` pages.
 
-1. Push this repo to GitHub and import it in Vercel.
-2. Set **all** production env vars (see table above).  
-   - `NEXTAUTH_URL` = your live URL, e.g. `https://hr.yourdomain.com`
-3. MongoDB Atlas → **Network Access** → allow Vercel (`0.0.0.0/0` is fine for serverless). Enable backups.
-4. Deploy. Seed admin once against the production database (`npm run seed:admin` locally with prod `MONGODB_URI`).
-5. Confirm crons in Vercel → **Crons**:
-   - Birthdays: `/api/cron/birthdays` — `0 19 * * *` (19:00 UTC = 00:00 PKT)
-   - Review sync (internship/probation end → Due Review): `/api/cron/check-reviews` — `0 19 * * *` (19:00 UTC = 00:00 PKT)
-   - Leave reset (year rollover): `/api/cron/leave-reset` — `0 19 * * *` (19:00 UTC = 00:00 PKT, checks Asia/Karachi year daily)
-   - Auto check-out: `/api/cron/employee-attendance` — runs once daily at `0 15 * * *` UTC (**8:00 PM Asia/Karachi**). If the admin Auto Check-Out option is enabled, it closes still-open, unlocked, non-future attendance records and stamps checkout at the configured shift end. If disabled, no records are changed.
+## Smoke check
 
-All cron routes **require** `CRON_SECRET`. Vercel sends `Authorization: Bearer <CRON_SECRET>` automatically.
-
-> Vercel cron schedules use UTC. The auto-checkout job is intentionally a single daily run; Vercel delivery can have platform timing variance.
-
----
-
-## Attendance model (important)
-
-```mermaid
-flowchart TD
-  CI[Employee check-in] --> REC[(Attendance day record)]
-  CO[Employee check-out] --> REC
-  CRON[Daily auto-checkout<br/>PKT 20:00] -->|if autoCheckOut enabled| REC
-  ADMIN[Admin manual / retro edit] --> REC
-  REC --> MONTH[(MonthlyAttendance aggregates)]
-  LOCK[Month lock] --> MONTH
-```
-
-- Timezone: **Asia/Karachi**
-- Auto check-out is controlled only by the `autoCheckOut` setting and runs at 8:00 PM Asia/Karachi.
-- Locked months are **not** reopened by sync / cron
-- When auto check-out is **off**, forgotten open shifts stay open for admin correction (no silent corruption)
-
-> Biometric fingerprint machines are **not** integrated yet. Admin “Refresh Attendance” only reloads data from MongoDB.
-
----
-
-## Security notes
-
-- Never commit `.env` (ignored via `.gitignore`; only `.env.example` is tracked)
-- Rotate secrets if they were ever pushed historically
-- Keep `CRON_SECRET` set in production — cron routes reject requests without it
-- Employees can only access their own payslips / leave / attendance
-- Profile photo upload goes through an authenticated API (API secret stays server-side)
-
----
-
-## Production smoke checklist
-
-After deploy:
-
-- [ ] Admin login
-- [ ] Employee login
-- [ ] Create employee → welcome email received
-- [ ] Forgot password → reset link uses production `NEXTAUTH_URL`
-- [ ] Profile photo upload
-- [ ] Check-in / check-out
-- [ ] Create payslip + PDF download
-- [ ] Leave request + admin approval
-- [ ] Cron endpoints return `401` without secret (expected)
-
----
+- Admin login and employee login
+- New employee welcome email
+- Password reset link uses the production `NEXTAUTH_URL`
+- A fingerprint punch shows on the employee attendance page
+- A full-day or half-day leave request, then approval
+- A head's own leave is not decided by that head
+- Month attendance PDF and payslip hours agree
+- Cron routes return 401 without the secret
 
 ## License
 
-Private / proprietary — all rights reserved unless otherwise stated by the repository owner.
+Private. All rights reserved unless the repository owner says otherwise.

@@ -488,7 +488,7 @@ export default function EmployeeDashboardPage() {
                           setLeaveForm({
                             ...leaveForm,
                             type,
-                            endDate: type === "HALF" ? leaveForm.startDate : leaveForm.endDate,
+                            endDate: type === "HALF" ? "1" : leaveForm.endDate === "2" ? "2" : "1",
                           });
                           setIsLeaveTypeDropdownOpen(false);
                         }}
@@ -507,7 +507,13 @@ export default function EmployeeDashboardPage() {
                   type="date"
                   required
                   value={leaveForm.startDate}
-                  onChange={(e) => setLeaveForm({ ...leaveForm, startDate: e.target.value, endDate: e.target.value })}
+                  onChange={(e) =>
+                    setLeaveForm({
+                      ...leaveForm,
+                      startDate: e.target.value,
+                      endDate: leaveForm.endDate === "2" ? "2" : "1",
+                    })
+                  }
                   className="form-input text-xs cursor-pointer"
                 />
               </div>

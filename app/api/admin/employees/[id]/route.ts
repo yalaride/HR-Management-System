@@ -6,7 +6,6 @@ import CompanyDetails from "@/modals/CompanyDetails";
 import { DepartmentHead } from "@/modals/DepartmentHead";
 import { getAdminUser } from "@/lib/auth";
 import { isValidObjectId } from "mongoose";
-import { applyEmployeeLeaveProration } from "@/lib/leave-proration";
 import {
   effectiveEmploymentPeriod,
   isEmploymentPeriodDue,
@@ -423,19 +422,6 @@ export async function PUT(
     if (clearedDeviceUserNo) {
       await Employee.updateOne({ _id: employee._id }, { $unset: { deviceUserNo: 1 } });
       employee.deviceUserNo = undefined;
-    }
-
-    // Keep the persisted balance aligned with the joining month. This also
-    // materializes balances for legacy employees when they become Permanent.
-    if (employee.userId && employee.joinDate) {
-      try {
-        await applyEmployeeLeaveProration(
-          employee.userId.toString(),
-          new Date(employee.joinDate)
-        );
-      } catch (prorationError) {
-        console.error("Leave balance synchronization error on update:", prorationError);
-      }
     }
 
     // 6. Department Head Cleanup

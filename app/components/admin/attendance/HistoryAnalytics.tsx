@@ -122,6 +122,7 @@ export default function HistoryAnalytics({
   const [isLoading, setIsLoading] = useState(false);
   const [hasLastMonth, setHasLastMonth] = useState(false);
   const [refreshCounter, setRefreshCounter] = useState(0);
+  const loadedKey = useRef("");
   const [deletingKey, setDeletingKey] = useState<string | null>(null);
 
   // Modular Retro Modal Controls
@@ -162,7 +163,8 @@ export default function HistoryAnalytics({
       await Promise.resolve();
       if (!isMounted) return;
 
-      setIsLoading(true);
+      const requestKey = `${selectedEmployeeId}:${period}`;
+      if (loadedKey.current !== requestKey) setIsLoading(true);
       try {
         const res = await fetch(`/api/admin/employee-attendance?userId=${selectedEmployeeId}&period=${period}`);
         if (res.ok && isMounted) {
@@ -173,6 +175,7 @@ export default function HistoryAnalytics({
           setEmployeeProfile(data.employee || { name: "", designation: "", department: "" });
           setStats(data.stats || {});
           setIsLocked(!!data.isLocked);
+          loadedKey.current = requestKey;
         }
       } catch (err) {
         console.error("Failed loading history statistics:", err);

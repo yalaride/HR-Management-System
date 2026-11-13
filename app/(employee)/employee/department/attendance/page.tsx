@@ -44,6 +44,7 @@ interface DaySheet {
   shiftTimeLabel: string;
   department: string;
   leaves?: DayLeave[];
+  holiday?: { title: string } | null;
 }
 
 const TIMEZONE = "Asia/Karachi";
@@ -68,6 +69,7 @@ const statusBadge: Record<string, string> = {
   Late: "bg-amber-50 text-amber-600 border-amber-200",
   Absent: "bg-rose-50 text-rose-600 border-rose-200",
   Leave: "bg-violet-50 text-violet-700 border-violet-200",
+  Holiday: "bg-sky-50 text-sky-700 border-sky-200",
 };
 
 export default function TeamAttendancePage() {
@@ -161,7 +163,15 @@ export default function TeamAttendancePage() {
                     const log = logs.find((l) => String(l.userId) === emp.userId);
                     const onLeave = leaves.some((leave) => leave.userId === emp.userId);
                     const hasCheckIn = Boolean(log?.checkIn);
-                    const statusLabel = hasCheckIn ? log?.status : onLeave ? "Leave" : log?.status;
+                    const statusLabel = hasCheckIn
+                      ? log?.status
+                      : onLeave
+                        ? "Leave"
+                        : sheet?.holiday
+                          ? "Holiday"
+                          : date < todayInKarachi()
+                            ? "Absent"
+                            : undefined;
 
                     return (
                       <tr key={emp.userId} className="border-b border-line-subtle last:border-0 hover:bg-surface-subtle/50">

@@ -105,6 +105,9 @@ export function validateEmployeeLeave(input: {
   if (input.end < input.start) {
     return { ok: false, error: "The end date cannot be before the start date." };
   }
+  if (isSundayIso(input.start)) {
+    return { ok: false, error: "Sunday is not a working day, so it cannot be requested as leave." };
+  }
   const earliest = earliestEmployeeStart(input.today);
   if (input.start < earliest) {
     return {
@@ -155,6 +158,9 @@ export function validateGrantedLeave(input: {
   }
   if (input.end < input.start) {
     return { ok: false, error: "The end date cannot be before the start date." };
+  }
+  if (isSundayIso(input.start)) {
+    return { ok: false, error: "Sunday is not a working day, so it cannot be set as leave." };
   }
   const currentMonthStart = `${monthKey(input.today)}-01`;
   if (input.start < currentMonthStart) {
