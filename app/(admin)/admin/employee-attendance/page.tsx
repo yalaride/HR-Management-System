@@ -273,7 +273,10 @@ export default function AdminAttendancePage() {
       checkOut: formatToLocalTimeInput(record?.checkOut, defaultCheckOut),
       hasCheckOut: hasCheckOut,
       enableCheckOut: hasCheckOut, 
-      status: record?.status && record.status !== "Holiday" ? record.status : "On Time",
+      status:
+        record?.status === "Late" || record?.status === "Absent" || record?.status === "On Time"
+          ? record.status
+          : "On Time",
       isLocked: !!targetRecord?.isLocked,
     });
     setIsEditModalOpen(true);
