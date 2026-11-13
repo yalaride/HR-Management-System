@@ -122,7 +122,7 @@ export async function GET() {
     const todayRecord = await Attendance.findOne({ userId, date: todayDateStr }).lean();
 
     const history = await Attendance.find({ userId })
-      .sort({ createdAt: -1 })
+      .sort({ date: -1 })
       .limit(30)
       .lean();
 

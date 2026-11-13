@@ -220,11 +220,13 @@ export async function getDayAttendanceSheet(date: string, options: DaySheetOptio
 
   let logs = allLogs;
   let monthlyRecords = allMonthlyRecords;
+  let visibleLeaves = approvedLeaves;
 
   if (options.department) {
     const memberIds = new Set(employeeDocs.map((e) => String(e.userId ?? "")));
     logs = allLogs.filter((l) => memberIds.has(String(l.userId)));
     monthlyRecords = allMonthlyRecords.filter((r) => memberIds.has(String(r.userId)));
+    visibleLeaves = approvedLeaves.filter((leave) => memberIds.has(String(leave.userId || "")));
   }
 
   const shiftStart = settings?.shiftStart || "09:00";
@@ -245,7 +247,7 @@ export async function getDayAttendanceSheet(date: string, options: DaySheetOptio
     shiftTimeLabel,
     companySettings: settings,
     holiday: holiday ? { title: holiday.title, startDate: holiday.startDate, endDate: holiday.endDate } : null,
-    leaves: approvedLeaves.map((leave) => ({
+    leaves: visibleLeaves.map((leave) => ({
       userId: String(leave.userId || ""),
       type: String(leave.type || ""),
     })),

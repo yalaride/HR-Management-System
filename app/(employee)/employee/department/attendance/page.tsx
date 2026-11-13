@@ -32,12 +32,18 @@ interface MonthlyRecord {
   isLocked?: boolean;
 }
 
+interface DayLeave {
+  userId: string;
+  type: string;
+}
+
 interface DaySheet {
   employees: TeamEmployee[];
   logs: AttendanceLog[];
   monthlyRecords: MonthlyRecord[];
   shiftTimeLabel: string;
   department: string;
+  leaves?: DayLeave[];
 }
 
 const TIMEZONE = "Asia/Karachi";
@@ -61,6 +67,7 @@ const statusBadge: Record<string, string> = {
   "On Time": "bg-emerald-50 text-emerald-600 border-emerald-200",
   Late: "bg-amber-50 text-amber-600 border-amber-200",
   Absent: "bg-rose-50 text-rose-600 border-rose-200",
+  Leave: "bg-violet-50 text-violet-700 border-violet-200",
 };
 
 export default function TeamAttendancePage() {
@@ -99,7 +106,8 @@ export default function TeamAttendancePage() {
 
   const employees = sheet?.employees ?? [];
   const logs = sheet?.logs ?? [];
-  const presentCount = logs.filter((l) => l.status === "On Time" || l.status === "Late").length;
+  const leaves = sheet?.leaves ?? [];
+  const presentCount = logs.filter((l) => l.checkIn && (l.status === "On Time" || l.status === "Late")).length;
 
   return (
     <div className="min-h-screen bg-surface-main text-content-main antialiased">
@@ -151,6 +159,9 @@ export default function TeamAttendancePage() {
                 <tbody>
                   {employees.map((emp) => {
                     const log = logs.find((l) => String(l.userId) === emp.userId);
+                    const onLeave = leaves.some((leave) => leave.userId === emp.userId);
+                    const hasCheckIn = Boolean(log?.checkIn);
+                    const statusLabel = hasCheckIn ? log?.status : onLeave ? "Leave" : log?.status;
 
                     return (
                       <tr key={emp.userId} className="border-b border-line-subtle last:border-0 hover:bg-surface-subtle/50">
@@ -168,13 +179,13 @@ export default function TeamAttendancePage() {
                           {log?.formattedDuration || "—"}
                         </td>
                         <td className="px-4 py-3">
-                          {log ? (
+                          {statusLabel ? (
                             <span
                               className={`inline-block px-2 py-1 rounded-lg border font-bold ${
-                                statusBadge[log.status] || "bg-gray-50 text-gray-500 border-gray-200"
+                                statusBadge[statusLabel] || "bg-gray-50 text-gray-500 border-gray-200"
                               }`}
                             >
-                              {log.status}
+                              {statusLabel}
                             </span>
                           ) : (
                             <span className="inline-block px-2 py-1 rounded-lg border font-bold bg-gray-50 text-gray-400 border-gray-200">

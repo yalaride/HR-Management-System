@@ -61,7 +61,10 @@ export default function EmployeeAttendancePage() {
   }>("/api/employee/attendance");
 
   const todayRecord = attendanceData?.todayRecord || null;
-  const history = useMemo(() => attendanceData?.history || [], [attendanceData]);
+  const history = useMemo(() => {
+    const rows = attendanceData?.history || [];
+    return [...rows].sort((a, b) => b.date.localeCompare(a.date));
+  }, [attendanceData]);
 
   // Total accumulated working hours excluding Absent days
   const totalAccumulatedHours = useMemo(() => {
