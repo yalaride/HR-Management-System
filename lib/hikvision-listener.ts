@@ -5,12 +5,10 @@ import { Employee } from "@/modals/Employee";
 import { deviceUserNoLookupKeys } from "@/lib/device-user-no";
 import { recordDevicePunch } from "@/lib/attendance-service";
 
-const FAIL_SUB_EVENTS = new Set([
-  6, 7, 8, 9, 10, 21, 22, 23, 39, 40, 41, 42, 43, 44, 45, 46, 51, 52, 76, 77, 78, 79, 80,
-]);
-
-// HikCentral Access Control access-denied event types.
 const FAIL_CENTRAL_EVENTS = new Set([197127, 197128, 197151, 197160, 197161]);
+
+// Real fingerprint success only. Face, card, and door events must not create attendance.
+const FINGERPRINT_SUB_EVENTS = new Set([3, 4, 5, 38]);
 
 function secretsMatch(provided: string | null | undefined, expected: string): boolean {
   if (!provided) return false;
@@ -68,18 +66,18 @@ function findInJson(node: unknown, keys: string[]): string | null {
 }
 
 /** Device local time without a zone is Pakistan time (UTC+5, no daylight saving). */
-export function parseDeviceDateTime(raw: string | null): Date {
-  if (!raw) return new Date();
+export function parseDeviceDateTime(raw: string | null): Date | null {
+  if (!raw?.trim()) return null;
   const trimmed = raw.trim();
   if (/[zZ]$|[+-]\d{2}:?\d{2}$/.test(trimmed)) {
     const parsed = new Date(trimmed);
-    return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
 
   const match = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})/);
   if (!match) {
     const parsed = new Date(trimmed);
-    return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
 
   const [, year, month, day, hour, minute, second] = match;
@@ -121,14 +119,17 @@ function classifyPunch(
   }
 
   const subCode = subEventType ? Number(subEventType) : NaN;
-  if (Number.isFinite(subCode) && FAIL_SUB_EVENTS.has(subCode)) {
+  if (!Number.isFinite(subCode) || !FINGERPRINT_SUB_EVENTS.has(subCode)) {
     return { kind: "ignored" };
   }
+
+  const punchedAt = parseDeviceDateTime(dateTime);
+  if (!punchedAt) return { kind: "ignored" };
 
   return {
     kind: "punch",
     employeeNo,
-    punchedAt: parseDeviceDateTime(dateTime),
+    punchedAt,
   };
 }
 

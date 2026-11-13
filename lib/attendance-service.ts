@@ -614,7 +614,7 @@ export async function deleteAttendanceHistory(input: {
   return { ok: true, deleted: dates.length, skippedLocked: 0 };
 }
 
-const DUPLICATE_PUNCH_MS = 45_000;
+const CHECKOUT_MIN_GAP_MS = 15 * 60 * 1000;
 
 type PunchLog = {
   _id?: unknown;
@@ -639,7 +639,7 @@ async function stripInvalidCheckouts<T extends PunchLog>(logs: T[], now = new Da
       Boolean(checkOut) &&
       checkInOk &&
       !isFutureFingerprint(checkOut as Date, now) &&
-      (checkOut as Date).getTime() > (checkIn as Date).getTime();
+      (checkOut as Date).getTime() - (checkIn as Date).getTime() >= CHECKOUT_MIN_GAP_MS;
 
     if (!log.checkOut || checkOutOk) return log;
 
@@ -724,7 +724,7 @@ export async function recordDevicePunch(input: {
     storedCheckOut &&
     usableCheckIn &&
     !isFutureFingerprint(storedCheckOut, now) &&
-    storedCheckOut.getTime() > usableCheckIn.getTime()
+    storedCheckOut.getTime() - usableCheckIn.getTime() >= CHECKOUT_MIN_GAP_MS
       ? storedCheckOut
       : null;
 
@@ -745,7 +745,7 @@ export async function recordDevicePunch(input: {
   const latest = new Date(Math.max(...stamps));
   const nextCheckIn = earliest;
   const nextCheckOut =
-    latest.getTime() - earliest.getTime() >= DUPLICATE_PUNCH_MS ? latest : null;
+    latest.getTime() - earliest.getTime() >= CHECKOUT_MIN_GAP_MS ? latest : null;
 
   const previousCheckIn = storedCheckIn ? storedCheckIn.getTime() : null;
   const previousCheckOut = storedCheckOut ? storedCheckOut.getTime() : null;
