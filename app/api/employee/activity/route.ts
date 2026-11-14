@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { canViewFullAuditLogs } from "@/lib/audit-log-access";
+import { isDeskOpen } from "@/lib/desk-mode";
 import { listActivityFeed } from "@/lib/activity-feed";
 
 export const dynamic = "force-dynamic";
@@ -8,7 +9,7 @@ export const dynamic = "force-dynamic";
 /** Lightweight check for sidebar — no log payload. */
 export async function HEAD() {
   const user = await getSessionUser();
-  if (!user || user.role !== "employee" || !canViewFullAuditLogs(user.email)) {
+  if (!user || user.role !== "employee" || !canViewFullAuditLogs(user.email) || !(await isDeskOpen())) {
     return new NextResponse(null, { status: 403 });
   }
   return new NextResponse(null, { status: 204 });
@@ -21,7 +22,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (!canViewFullAuditLogs(user.email)) {
+    if (!canViewFullAuditLogs(user.email) || !(await isDeskOpen())) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

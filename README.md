@@ -9,12 +9,12 @@ Production HR portal for Sync Up. Admins manage people, attendance, leave, and p
 | People | Employee directory. Inactive and Terminated employees stay out of the daily sheet. |
 | Attendance | Fingerprint punches from the office Hikvision device. Earliest punch of the Karachi day is check-in. A later punch becomes check-out only when it is at least 15 minutes after check-in. |
 | Leave | Each month: 2 full days and 1 half day (20 hours). Unused leave does not move to the next month. Employees apply at least 2 days ahead. Sunday is not a leave day. |
-| Urgent and extra paid leave | Set by an admin, or by an employee on the audit-log allowlist. These are not self-serve. |
+| Urgent and extra paid leave | Set by Admin. These are not self-serve. |
 | Payslips | Generated from the same payable hours as the month attendance PDF: extra hours cover short days first, then the remaining monthly leave hours. |
 | Birthdays and reviews | Two daily Vercel crons email birthdays and mark internship or probation reviews due. |
 | Access | NextAuth JWT. Pages are split into `/admin` and `/employee`. |
 
-Department heads approve leave for their own department. A department head's own leave, and any other head's leave, is decided by an admin or the allowlisted reviewer. Heads can view team attendance. They cannot change check-in or check-out.
+Department heads approve leave for their own department. A department head's own leave, and any other head's leave, is decided by Admin. Heads can view team attendance. They cannot change check-in or check-out.
 
 ## System overview
 
@@ -71,7 +71,7 @@ flowchart LR
 - Timezone is Asia/Karachi.
 - The device cannot call Vercel. `scripts/hikvision-bridge.ps1` runs on the office PC, reads fingerprint events, and posts them to `/api/hikvision/events`.
 - Only fingerprint success events become punches. Face, card, and door events do not.
-- Admin, and an allowlisted editor, can set or correct a day's times. Deleting an attendance day is limited to the allowlist.
+- Admin can set or correct a day's times.
 - The month PDF shows attended, extra, paid, short, and payable hours. Extra minutes fill short days first. What remains can be covered by the unused part of the 20-hour monthly leave. Approved full, half, and urgent leave already use part of those 20 hours. Extra paid leave and holidays do not.
 - A worked day on approved full leave counts the actual hours. A leave day with no completed punch stays paid leave.
 
@@ -136,7 +136,6 @@ Open `http://localhost:3000`.
 | `RESEND_API_KEY` and `RESEND_FROM_EMAIL` | Mail |
 | `CLOUDINARY_URL` or the three Cloudinary keys | Profile photos |
 | `HIKVISION_LISTENER_SECRET` | Secret in the fingerprint listener path |
-| `AUDIT_LOG_VIEWER_EMAILS` | Optional extra emails for activity logs, head-leave review, and granted leave |
 
 The first admin is a user document with role `admin`. This repo does not ship a seed command.
 

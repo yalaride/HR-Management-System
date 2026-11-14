@@ -5,6 +5,7 @@ import { Employee } from "@/modals/Employee";
 import CompanyDetails from "@/modals/CompanyDetails";
 import { getSessionUser } from "@/lib/auth";
 import { getPayableHoursForMonth } from "@/lib/attendance-service";
+import { isDeskUser } from "@/lib/desk-mode";
 
 // TypeScript interfaces to ensure correct type resolution from lean queries
 interface IEmployee {
@@ -34,7 +35,7 @@ export async function GET(request: Request) {
     if (!sessionUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const isAdmin = sessionUser.role === "admin";
+    const isAdmin = sessionUser.role === "admin" || (await isDeskUser(sessionUser));
 
     await connectDB();
 
@@ -94,11 +95,7 @@ export async function GET(request: Request) {
       const hourlyRate = employee.hourlyRate || 0;
       // Formula: workinghour * hourlyrate = basicSalary
       const basicSalary = totalWorkingHours * hourlyRate;
-      
-      // Formula: standardWorkingHours * hourlyrate = standardSalary
-      // deduction = standardSalary - basicSalary
-      const standardSalary = standardHours * hourlyRate;
-      const deductions = Math.max(0, standardSalary - basicSalary);
+      const deductions = 0;
 
       return NextResponse.json({
         totalWorkingHours,
@@ -165,7 +162,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const sessionUser = await getSessionUser();
-    if (!sessionUser || sessionUser.role !== "admin") {
+    if (!sessionUser || !(sessionUser.role === "admin" || (await isDeskUser(sessionUser)))) {
       return NextResponse.json({ error: "Forbidden: Admin access required." }, { status: 403 });
     }
 

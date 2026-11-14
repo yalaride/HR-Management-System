@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
+import { canViewFullAuditLogs } from "@/lib/audit-log-access";
 
 // The function must be named 'proxy' or be the default export when using proxy.ts
 export async function proxy(request: NextRequest) {
@@ -12,6 +13,11 @@ export async function proxy(request: NextRequest) {
   });
 
   const role = token?.role as string | undefined;
+  const email = typeof token?.email === "string" ? token.email : "";
+  const deskOpen =
+    role === "employee" &&
+    request.cookies.get("desk_open")?.value === "1" &&
+    canViewFullAuditLogs(email);
 
   // 1. Handle requests to the main page "/"
   if (pathname === "/") {
@@ -32,7 +38,7 @@ export async function proxy(request: NextRequest) {
     if (!token) {
       return NextResponse.redirect(new URL("/", request.url));
     }
-    if (role !== "admin") {
+    if (role !== "admin" && !deskOpen) {
       return NextResponse.redirect(new URL("/unauthorized", request.url));
     }
   }

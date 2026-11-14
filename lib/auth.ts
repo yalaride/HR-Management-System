@@ -4,6 +4,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import dbConnect from "@/lib/mongodb";
 import User from "@/modals/User";
+import { isDeskUser } from "@/lib/desk-mode";
 
 // Module Declaration Merging to ensure TypeScript works cleanly
 declare module "next-auth" {
@@ -111,7 +112,7 @@ export const authOptions: AuthOptions = {
       if (now - lastChecked > THROTTLE_TIME) {
         try {
           await dbConnect();
-          const dbUser = await User.findById(token.id).select("role tokenVersion");
+          const dbUser = await User.findById(token.id).select("role tokenVersion email");
           const dbTokenVersion = dbUser?.tokenVersion ?? 0;
           const currentTokenVersion = token.tokenVersion ?? 0;
 
@@ -122,6 +123,7 @@ export const authOptions: AuthOptions = {
           } else {
             // Keep token details up to date with DB changes
             token.role = dbUser.role || "employee";
+            token.email = dbUser.email;
             token.tokenVersion = dbTokenVersion;
             token.lastChecked = now;
           }
@@ -188,6 +190,8 @@ export async function getSessionUser(): Promise<SessionUser | null> {
  */
 export async function getAdminUser(): Promise<SessionUser | null> {
   const user = await getSessionUser();
-  if (!user || user.role !== "admin") return null;
-  return user;
+  if (!user) return null;
+  if (user.role === "admin") return user;
+  if (await isDeskUser(user)) return user;
+  return null;
 }

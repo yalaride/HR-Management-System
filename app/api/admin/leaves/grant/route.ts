@@ -5,6 +5,7 @@ import { Employee } from "@/modals/Employee";
 import { ActivityLog } from "@/modals/ActivityLog";
 import { getSessionUser } from "@/lib/auth";
 import { canViewFullAuditLogs } from "@/lib/audit-log-access";
+import { isDeskOpen } from "@/lib/desk-mode";
 import { karachiToday, validateGrantedLeave, type QuotaLeave } from "@/lib/monthly-leave";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +13,8 @@ export const dynamic = "force-dynamic";
 async function requireGranter() {
   const user = await getSessionUser();
   if (!user) return null;
-  if (user.role === "admin" || canViewFullAuditLogs(user.email)) return user;
+  if (user.role === "admin") return user;
+  if (canViewFullAuditLogs(user.email) && (await isDeskOpen())) return user;
   return null;
 }
 

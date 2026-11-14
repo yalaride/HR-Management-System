@@ -494,10 +494,13 @@ export async function getPayableHoursForMonth(userId: string, year: number, mont
   await dbConnect();
   const todayStr = getKarachiDateString();
   const monthStr = String(month).padStart(2, "0");
-  const from = `${year}-${monthStr}-01`;
+  let from = `${year}-${monthStr}-01`;
   const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
   let to = `${year}-${monthStr}-${String(lastDay).padStart(2, "0")}`;
   if (to > todayStr) to = todayStr;
+  const employee = await Employee.findOne({ userId }).select("joinDate").lean<{ joinDate?: Date | null } | null>();
+  const joinDate = employee?.joinDate ? getKarachiDateString(new Date(employee.joinDate)) : "";
+  if (joinDate && joinDate > from) from = joinDate;
   if (from > to) return 0;
 
   const [logs, holidays, leaves, omissions, settings] = await Promise.all([

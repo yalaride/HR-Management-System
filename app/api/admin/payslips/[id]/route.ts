@@ -4,6 +4,7 @@ import CompanyDetails from "@/modals/CompanyDetails";
 import { Payslip } from "@/modals/Payslip";
 import { Employee } from "@/modals/Employee";
 import { getSessionUser } from "@/lib/auth";
+import { isDeskUser } from "@/lib/desk-mode";
 
 // Returns fresh payslip + company details for PDF generation.
 
@@ -37,7 +38,7 @@ export async function GET(
     }
 
     // Ownership check: employees may only fetch their own payslips
-    if (sessionUser.role !== "admin") {
+    if (!(sessionUser.role === "admin" || (await isDeskUser(sessionUser)))) {
       const ownEmployee = (await Employee.findOne({ userId: sessionUser.id })
         .select("_id")
         .lean()) as { _id: { toString(): string } } | null;
@@ -69,7 +70,7 @@ export async function DELETE(
 ) {
   try {
     const sessionUser = await getSessionUser();
-    if (!sessionUser || sessionUser.role !== "admin") {
+    if (!sessionUser || !(sessionUser.role === "admin" || (await isDeskUser(sessionUser)))) {
       return NextResponse.json({ error: "Forbidden: Admin access required." }, { status: 403 });
     }
 

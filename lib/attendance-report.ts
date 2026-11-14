@@ -262,9 +262,9 @@ export function buildAttendanceReport(input: {
       const worked = checkIn && checkOut
         ? Math.max(0, Math.floor((checkOut.getTime() - checkIn.getTime()) / 60000))
         : 0;
-      const extra = Math.max(0, worked - REQUIRED_DAY_MINUTES);
       const paid = REQUIRED_DAY_MINUTES / 2;
       const countedWork = Math.min(worked, REQUIRED_DAY_MINUTES - paid);
+      const extra = Math.max(0, worked - countedWork);
       const short = Math.max(0, REQUIRED_DAY_MINUTES - countedWork - paid);
       leaveDays += 1;
       allowanceUsedMinutes += paid;

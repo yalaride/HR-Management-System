@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import Swal from "sweetalert2";
+import { useRouter } from "next/navigation";
 import { Loader2, ShieldAlert, CheckCircle2, XCircle, CalendarDays, Trash2 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { ApiError } from "@/lib/api-client";
-import { canDeleteAttendance } from "@/lib/audit-log-access";
 
 interface HeadLeave {
   id: string;
@@ -38,8 +38,16 @@ const statusBadge: Record<string, string> = {
 };
 
 export default function HeadLeavesPage() {
+  const router = useRouter();
   const { data: session } = useSession();
-  const canDelete = session?.user?.role === "admin" || canDeleteAttendance(session?.user);
+  const isEmployeeSession = session?.user?.role === "employee";
+  const { data: desk } = useSWR<{ active?: boolean }>(isEmployeeSession ? "/api/employee/desk" : null);
+
+  useEffect(() => {
+    if (!isEmployeeSession || !desk) return;
+    if (!desk.active) router.replace("/employee/dashboard");
+  }, [desk, isEmployeeSession, router]);
+  const canDelete = session?.user?.role === "admin" || Boolean(desk?.active);
   const [actioningId, setActioningId] = useState<string | null>(null);
   const [filter, setFilter] = useState<"All" | "Pending" | "Approved" | "Rejected">("All");
 

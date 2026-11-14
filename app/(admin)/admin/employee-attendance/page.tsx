@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import useSWR from "swr";
 import { useSession } from "next-auth/react";
+import { usePathname, useRouter } from "next/navigation";
 import { Plus, RefreshCw, AlertCircle } from "lucide-react";
 
 import AttendanceSummaryCards from "@/app/components/admin/attendance/AttendanceSummaryCards";
@@ -10,7 +11,6 @@ import AttendanceFilters from "@/app/components/admin/attendance/AttendanceFilte
 import AttendanceTable from "@/app/components/admin/attendance/AttendanceTable";
 import HistoryAnalytics from "@/app/components/admin/attendance/HistoryAnalytics";
 import AttendanceSettings from "@/app/components/admin/settings/AttendanceSettings";
-import { canDeleteAttendance } from "@/lib/audit-log-access";
 
 // Modal Forms Imports
 import ManualAttendanceModal from "@/app/components/admin/attendance/ManualAttendanceModal";
@@ -144,8 +144,19 @@ export default function AdminAttendancePage() {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
   const { data: session } = useSession();
-  const canEditShiftRules = session?.user?.role === "admin";
-  const canDeleteRows = canDeleteAttendance(session?.user);
+  const pathname = usePathname();
+  const router = useRouter();
+  const isEmployeeSession = session?.user?.role === "employee";
+  const { data: desk } = useSWR<{ active?: boolean }>(isEmployeeSession ? "/api/employee/desk" : null);
+  const canEditShiftRules = session?.user?.role === "admin" || Boolean(desk?.active);
+  const canDeleteRows = Boolean(desk?.active);
+
+  useEffect(() => {
+    if (!isEmployeeSession || !desk) return;
+    if (!desk.active && pathname.startsWith("/employee")) {
+      router.replace("/employee/dashboard");
+    }
+  }, [desk, isEmployeeSession, pathname, router]);
 
   const [isSyncing, setIsSyncing] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);

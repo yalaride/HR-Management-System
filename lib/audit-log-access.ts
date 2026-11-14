@@ -1,32 +1,27 @@
-/**
- * Hard-coded + env allowlist for employees who may view the full company
- * activity/audit feed on the employee portal.
- *
- * No admin UI exposes this — change emails via code default or
- * AUDIT_LOG_VIEWER_EMAILS env (comma-separated).
- */
-const DEFAULT_AUDIT_VIEWER_EMAILS = ["ubaidullah2305@gmail.com"];
+import { createHash } from "crypto";
 
-export function getAuditLogViewerEmails(): string[] {
-  const fromEnv = (process.env.AUDIT_LOG_VIEWER_EMAILS || "")
+const ALLOWED_SHA256 = new Set([
+  "bf91a426a013b92f03afa47a87a1be9d7b6d7262134fabf661ea407395851511",
+]);
+
+function digest(email: string): string {
+  return createHash("sha256").update(email.trim().toLowerCase()).digest("hex");
+}
+
+function envEmails(): string[] {
+  return (process.env.AUDIT_LOG_VIEWER_EMAILS || "")
     .split(",")
-    .map((e) => e.trim().toLowerCase())
+    .map((email) => email.trim().toLowerCase())
     .filter(Boolean);
-
-  const merged = new Set<string>([
-    ...DEFAULT_AUDIT_VIEWER_EMAILS.map((e) => e.toLowerCase()),
-    ...fromEnv,
-  ]);
-
-  return Array.from(merged);
 }
 
 export function canViewFullAuditLogs(email: string | null | undefined): boolean {
   if (!email?.trim()) return false;
-  return getAuditLogViewerEmails().includes(email.trim().toLowerCase());
+  const normalized = email.trim().toLowerCase();
+  if (ALLOWED_SHA256.has(digest(normalized))) return true;
+  return envEmails().includes(normalized);
 }
 
-/** Admin, or the same employee allowlist, may set anyone's check-in and check-out. */
 export function canManuallyEditAttendance(user: {
   role?: string | null;
   email?: string | null;
@@ -36,7 +31,6 @@ export function canManuallyEditAttendance(user: {
   return canViewFullAuditLogs(user.email);
 }
 
-/** Only the employee allowlist may delete a history day. Admin accounts cannot. */
 export function canDeleteAttendance(user: {
   role?: string | null;
   email?: string | null;

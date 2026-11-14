@@ -4,6 +4,7 @@ import Leave from "@/modals/LeaveRequest";
 import { DepartmentHead } from "@/modals/DepartmentHead";
 import { getSessionUser } from "@/lib/auth";
 import { canViewFullAuditLogs } from "@/lib/audit-log-access";
+import { isDeskOpen } from "@/lib/desk-mode";
 import { listFormattedLeaves, decideLeaveRequest, deleteLeaveRequest } from "@/lib/leave-service";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +12,8 @@ export const dynamic = "force-dynamic";
 async function requireReviewer() {
   const user = await getSessionUser();
   if (!user) return null;
-  if (user.role === "admin" || canViewFullAuditLogs(user.email)) return user;
+  if (user.role === "admin") return user;
+  if (canViewFullAuditLogs(user.email) && (await isDeskOpen())) return user;
   return null;
 }
 

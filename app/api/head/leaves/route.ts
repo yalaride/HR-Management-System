@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
 import Leave from "@/modals/LeaveRequest";
 import { DepartmentHead } from "@/modals/DepartmentHead";
+import { canViewFullAuditLogs } from "@/lib/audit-log-access";
 import { getDepartmentHeadContext, getDepartmentMemberUserIds } from "@/lib/department-head";
 import { listFormattedLeaves, decideLeaveRequest } from "@/lib/leave-service";
 
@@ -84,7 +85,9 @@ export async function PUT(req: Request) {
     const result = await decideLeaveRequest(
       id,
       action,
-      `by department head ${ctx.user.name || ""}`.trim()
+      canViewFullAuditLogs(ctx.user.email)
+        ? "by Admin"
+        : `by department head ${ctx.user.name || ""}`.trim()
     );
 
     if (!result.ok) {

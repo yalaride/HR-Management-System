@@ -247,7 +247,7 @@ function UnifiedHeaderCard({
                 </span>
               </div>
               <span className="text-[11px] text-content-muted font-medium truncate mt-0.5 leading-tight">
-                {userEmail}
+                {userEmail || "Admin"}
               </span>
             </div>
           </div>
@@ -335,67 +335,32 @@ export default function Sidebar({ role }: SidebarProps) {
     (isAdminFromSession ? "admin" : isEmployeeFromSession ? "employee" : null) ||
     fallbackPathRole;
 
-  // Department-head status
   const sessionUserId = session?.user?.id;
+  const { data: desk, mutate: refreshDesk } = useSWR<{ eligible?: boolean; active?: boolean }>(
+    isEmployeeFromSession && sessionUserId ? "/api/employee/desk" : null
+  );
+  const deskEligible = Boolean(desk?.eligible);
+  const deskActive = Boolean(desk?.active);
+
+  // Department-head status
   const { data: headStatus } = useSWR<{ isHead?: boolean }>(
     displayRole === "employee" && sessionUserId ? "/api/head/me" : null
   );
   const isDepartmentHead = Boolean(headStatus?.isHead);
 
-  // Full activity feed
-  const { data: auditAccess } = useSWR<{ canView?: boolean }>(
-    displayRole === "employee" && sessionUserId ? "/api/employee/activity?probe=1" : null,
-    async (url: string) => {
-      const res = await fetch(url);
-      if (res.status === 401 || res.status === 403) return { canView: false };
-      if (!res.ok) return { canView: false };
-      return res.json();
-    }
-  );
-  const canViewAuditLogs = Boolean(auditAccess?.canView);
-
-  const auditLogNavItem = {
-    href: "/employee/activity",
-    label: "Activity Logs",
-    icon: <Activity className="w-5 h-5 shrink-0" />,
-  };
-
-  const attendanceDeskNavItem = {
-    href: "/employee/attendance-records",
-    label: "Set Attendance",
-    icon: <CalendarClock className="w-5 h-5 shrink-0" />,
-  };
-
-  const headLeavesNavItem = {
-    href: "/employee/head-leaves",
-    label: "Head Leaves",
-    icon: <UserCheck className="w-5 h-5 shrink-0" />,
-  };
-
-  const grantLeaveNavItem = {
-    href: "/employee/grant-leave",
-    label: "Set Leave",
-    icon: <CalendarRange className="w-5 h-5 shrink-0" />,
-  };
-
   let activeNavItems = [...navItems[displayRole]];
   if (displayRole === "employee" && isDepartmentHead) {
     activeNavItems = [...activeNavItems, ...departmentHeadNavItems];
   }
-  if (displayRole === "employee" && canViewAuditLogs) {
-    const profileIdx = activeNavItems.findIndex((item) => item.href === "/employee/profile");
-    if (profileIdx >= 0) {
-      activeNavItems = [
-        ...activeNavItems.slice(0, profileIdx),
-        attendanceDeskNavItem,
-        headLeavesNavItem,
-        grantLeaveNavItem,
-        auditLogNavItem,
-        ...activeNavItems.slice(profileIdx),
-      ];
-    } else {
-      activeNavItems = [...activeNavItems, attendanceDeskNavItem, headLeavesNavItem, grantLeaveNavItem, auditLogNavItem];
-    }
+  if (deskActive && displayRole === "admin") {
+    activeNavItems = [
+      ...activeNavItems,
+      {
+        href: "/admin/activity",
+        label: "Activity Logs",
+        icon: <Activity className="w-5 h-5 shrink-0" />,
+      },
+    ];
   }
 
   const defaultProfile =
@@ -404,11 +369,28 @@ export default function Sidebar({ role }: SidebarProps) {
       : { name: "Employee User", email: "employee@vibeflow.com", avatarLabel: "EM" };
 
   const matchesActiveContext = sessionRole === displayRole;
-  const currentProfile = {
-    role: displayRole,
-    name: matchesActiveContext && session?.user?.name ? session.user.name : defaultProfile.name,
-    email: matchesActiveContext && session?.user?.email ? session.user.email : defaultProfile.email,
-    avatarLabel: defaultProfile.avatarLabel,
+  const currentProfile = deskActive
+    ? { role: "admin" as const, name: "Admin", email: "", avatarLabel: "AD" }
+    : {
+        role: displayRole,
+        name: matchesActiveContext && session?.user?.name ? session.user.name : defaultProfile.name,
+        email: matchesActiveContext && session?.user?.email ? session.user.email : defaultProfile.email,
+        avatarLabel: defaultProfile.avatarLabel,
+      };
+
+  const openDesk = async () => {
+    const res = await fetch("/api/employee/desk", { method: "POST" });
+    if (!res.ok) return;
+    await refreshDesk();
+    router.push("/admin/dashboard");
+    router.refresh();
+  };
+
+  const closeDesk = async () => {
+    await fetch("/api/employee/desk", { method: "DELETE" });
+    await refreshDesk();
+    router.push("/employee/dashboard");
+    router.refresh();
   };
 
   return (
@@ -445,7 +427,9 @@ export default function Sidebar({ role }: SidebarProps) {
               <div className="absolute right-0 mt-2.5 w-56 rounded-2xl bg-surface-card border border-line-subtle shadow-lg z-50 p-2 space-y-1">
                 <div className="px-3 py-2 border-b border-line-subtle">
                   <p className="text-xs font-bold text-content-main truncate">{currentProfile.name}</p>
-                  <p className="text-[11px] text-content-muted truncate mt-0.5">{currentProfile.email}</p>
+                  {currentProfile.email ? (
+                    <p className="text-[11px] text-content-muted truncate mt-0.5">{currentProfile.email}</p>
+                  ) : null}
                 </div>
 
                 <Link
@@ -465,6 +449,7 @@ export default function Sidebar({ role }: SidebarProps) {
                   type="button"
                   onClick={async () => {
                     setIsProfileOpen(false);
+                    if (deskActive) await fetch("/api/employee/desk", { method: "DELETE" });
                     await signOut({ redirect: false });
                     router.push("/");
                     router.refresh();
@@ -540,11 +525,38 @@ export default function Sidebar({ role }: SidebarProps) {
         </div>
 
         {/* Footer Logout Action */}
-        <div className="pt-3 border-t border-line-subtle mt-3">
+        <div className="pt-3 border-t border-line-subtle mt-3 space-y-1.5">
+          {deskEligible && !deskActive && (
+            <button
+              type="button"
+              title={isCollapsed ? "Full access" : undefined}
+              onClick={() => void openDesk()}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold tracking-wide text-content-secondary hover:text-content-main hover:bg-surface-main transition-all duration-150 cursor-pointer overflow-hidden ${
+                isCollapsed ? "justify-center" : ""
+              }`}
+            >
+              <PanelLeftOpen className="w-5 h-5 shrink-0" />
+              {!isCollapsed && <span className="truncate"></span>}
+            </button>
+          )}
+          {deskActive && (
+            <button
+              type="button"
+              title={isCollapsed ? "Employee view" : undefined}
+              onClick={() => void closeDesk()}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold tracking-wide text-content-secondary hover:text-content-main hover:bg-surface-main transition-all duration-150 cursor-pointer overflow-hidden ${
+                isCollapsed ? "justify-center" : ""
+              }`}
+            >
+              <PanelLeftClose className="w-5 h-5 shrink-0" />
+              {!isCollapsed && <span className="truncate">Employee view</span>}
+            </button>
+          )}
           <button
             type="button"
             title={isCollapsed ? "Log out" : undefined}
             onClick={async () => {
+              if (deskActive) await fetch("/api/employee/desk", { method: "DELETE" });
               await signOut({ redirect: false });
               router.push("/");
               router.refresh();

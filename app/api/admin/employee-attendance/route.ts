@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { canDeleteAttendance, canManuallyEditAttendance } from "@/lib/audit-log-access";
+import { isDeskOpen } from "@/lib/desk-mode";
 import {
   deleteAttendanceHistory,
   getDayAttendanceSheet,
@@ -13,7 +14,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   try {
     const user = await getSessionUser();
-    if (!canManuallyEditAttendance(user)) {
+    if (!canManuallyEditAttendance(user) || (user?.role !== "admin" && !(await isDeskOpen()))) {
       return NextResponse.json({ error: "Forbidden: You cannot view attendance records." }, { status: 403 });
     }
 
@@ -42,7 +43,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const user = await getSessionUser();
-    if (!canManuallyEditAttendance(user)) {
+    if (!canManuallyEditAttendance(user) || (user?.role !== "admin" && !(await isDeskOpen()))) {
       return NextResponse.json({ error: "Forbidden: You cannot set check-in or check-out." }, { status: 403 });
     }
 
@@ -69,7 +70,7 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const user = await getSessionUser();
-    if (!canDeleteAttendance(user)) {
+    if (!canDeleteAttendance(user) || !(await isDeskOpen())) {
       return NextResponse.json({ error: "Forbidden: You cannot delete attendance." }, { status: 403 });
     }
 
