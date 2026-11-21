@@ -20,6 +20,14 @@ interface AttendanceRecord {
   status: "On Time" | "Late" | "Absent";
 }
 
+interface RecentDay {
+  date: string;
+  checkIn: string;
+  checkOut: string;
+  worked: string;
+  status: "On Time" | "Late" | "Absent" | "Holiday" | "Leave";
+}
+
 function formatElapsed(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000));
   const hours = Math.floor(total / 3600);
@@ -62,15 +70,14 @@ export default function EmployeeAttendancePage() {
   } = useSWR<{
     todayRecord?: AttendanceRecord | null;
     history?: AttendanceRecord[];
+    recentDays?: RecentDay[];
   }>("/api/employee/attendance");
 
   const todayRecord = attendanceData?.todayRecord || null;
   const sessionElapsed = useSessionElapsed(todayRecord?.checkIn, todayRecord?.checkOut);
   const sessionRunning = Boolean(todayRecord?.checkIn && !todayRecord?.checkOut);
-  const history = useMemo(() => {
-    const rows = attendanceData?.history || [];
-    return [...rows].sort((a, b) => b.date.localeCompare(a.date));
-  }, [attendanceData]);
+  const recentDays = attendanceData?.recentDays || [];
+  const history = useMemo(() => attendanceData?.history || [], [attendanceData]);
 
   // Total accumulated working hours excluding Absent days
   const totalAccumulatedHours = useMemo(() => {
@@ -81,7 +88,7 @@ export default function EmployeeAttendancePage() {
     return Math.round(total * 100) / 100;
   }, [history]);
 
-  const getStatusBadgeStyle = (status: AttendanceRecord["status"]) => {
+  const getStatusBadgeStyle = (status: RecentDay["status"] | AttendanceRecord["status"]) => {
     switch (status) {
       case "On Time":
         return "bg-emerald-50 text-emerald-700 border-emerald-200";
@@ -89,6 +96,10 @@ export default function EmployeeAttendancePage() {
         return "bg-amber-50 text-amber-700 border-amber-200";
       case "Absent":
         return "bg-rose-50 text-rose-700 border-rose-200";
+      case "Leave":
+        return "bg-violet-50 text-violet-700 border-violet-200";
+      case "Holiday":
+        return "bg-sky-50 text-sky-700 border-sky-200";
       default:
         return "bg-surface-main text-content-secondary border-line-subtle";
     }
@@ -254,26 +265,26 @@ export default function EmployeeAttendancePage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-line-subtle text-content-secondary text-xs">
-                {history.length === 0 ? (
+                {recentDays.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-6 py-12 text-center text-content-muted">
-                      No punches recorded yet. They will appear after the fingerprint device is connected.
+                      No attendance days yet this month.
                     </td>
                   </tr>
                 ) : (
-                  history.map((record) => (
-                    <tr key={record._id} className="hover:bg-surface-main/50 transition">
+                  recentDays.map((record) => (
+                    <tr key={record.date} className="hover:bg-surface-main/50 transition">
                       <td className="px-6 py-4 font-bold text-content-main">
                         {record.date}
                       </td>
                       <td className="px-6 py-4 font-medium text-content-secondary">
-                        {formatTimeStr(record.checkIn)}
+                        {record.checkIn === "—" ? "—" : record.checkIn}
                       </td>
                       <td className="px-6 py-4 font-medium text-content-secondary">
-                        {record.checkOut ? formatTimeStr(record.checkOut) : "Ongoing"}
+                        {record.worked === "In progress" ? "Ongoing" : record.checkOut}
                       </td>
                       <td className="px-6 py-4 font-bold text-content-main">
-                        {record.status === "Absent" ? "--" : record.formattedDuration || "--"}
+                        {record.worked === "—" ? "--" : record.worked}
                       </td>
                       <td className="px-6 py-4 text-center">
                         <div className="inline-flex items-center justify-center">

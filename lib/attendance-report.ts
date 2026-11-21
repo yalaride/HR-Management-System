@@ -436,6 +436,25 @@ export function buildAttendanceReport(input: {
     leaveCover += fromLeave;
     paidMinutes += fromExtra + fromLeave;
     finalShort += gap;
+    if (leaveAdjusted && fromLeave > 0) {
+      leaveMinutes += fromLeave;
+      if (gap === 0) {
+        day.arrival = "Paid leave";
+        day.worked = "—";
+        day.short = "—";
+        day.paid = "8 hrs 0 mins";
+        day.detail = "Adjusted with monthly leave · no deduction";
+        day.rawShortMinutes = 0;
+        absentDays -= 1;
+        leaveDays += 1;
+      } else {
+        day.short = displayShort(gap);
+        day.paid = formatMinutes(fromLeave);
+        day.detail = `${formatMinutes(fromLeave)} adjusted with monthly leave. Still short ${formatMinutes(gap)}.`;
+        day.rawShortMinutes = gap;
+      }
+      continue;
+    }
     const notes: string[] = [];
     if (day.rawExtraMinutes) notes.push(`Extra ${formatMinutes(day.rawExtraMinutes)}`);
     if (fromExtra) notes.push(`${formatMinutes(fromExtra)} of this short day is covered by extra hours`);

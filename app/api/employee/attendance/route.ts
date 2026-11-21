@@ -5,7 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { Attendance } from "@/modals/Attendance";
 import { MonthlyAttendance } from "@/modals/MonthlyAttendance";
 import CompanyDetails from "@/modals/CompanyDetails";
-import { stripInvalidCheckouts } from "@/lib/attendance-service";
+import { getUserAttendanceHistory, stripInvalidCheckouts } from "@/lib/attendance-service";
 
 const TIMEZONE = "Asia/Karachi"; 
 
@@ -124,6 +124,21 @@ export async function GET() {
       await Attendance.find({ userId }).sort({ date: -1 }).limit(30).lean()
     );
     const todayRecord = history.find((row) => row.date === todayDateStr) ?? null;
+    const monthHistory = await getUserAttendanceHistory(userId, "this-month");
+    const recentDays = [...monthHistory.report.days].reverse().map((day) => ({
+      date: day.date,
+      checkIn: day.checkIn,
+      checkOut: day.checkOut,
+      worked: day.worked,
+      status:
+        day.arrival === "Paid leave"
+          ? "Leave"
+          : day.arrival === "Holiday"
+            ? "Holiday"
+            : day.arrival === "Unpaid leave"
+              ? "Absent"
+              : day.arrival,
+    }));
 
     const monthlyRecord = (await MonthlyAttendance.findOne({
       userId,
@@ -142,7 +157,7 @@ export async function GET() {
         }
       : null;
 
-    return NextResponse.json({ todayRecord, history, monthlyRecord, monthlyStats, settings }, { status: 200 });
+    return NextResponse.json({ todayRecord, history, recentDays, monthlyRecord, monthlyStats, settings }, { status: 200 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     return NextResponse.json(
