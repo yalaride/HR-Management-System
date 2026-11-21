@@ -6,6 +6,7 @@
 import dbConnect from "@/lib/mongodb";
 import { Attendance } from "@/modals/Attendance";
 import { AttendanceOmission } from "@/modals/AttendanceOmission";
+import { AbsenceLeaveCover } from "@/modals/AbsenceLeaveCover";
 import { Employee } from "@/modals/Employee";
 import { MonthlyAttendance } from "@/modals/MonthlyAttendance";
 import { ActivityLog } from "@/modals/ActivityLog";
@@ -324,7 +325,7 @@ export async function getUserAttendanceHistory(userId: string, period: string | 
   if (joinDate && joinDate > rangeFrom) rangeFrom = joinDate;
   if (rangeFrom > rangeTo) rangeFrom = rangeTo;
 
-  const [holidays, leaves, omissions] = await Promise.all([
+  const [holidays, leaves, omissions, absenceCovers] = await Promise.all([
     Holiday.find({ startDate: { $lte: rangeTo }, endDate: { $gte: rangeFrom } })
       .select("title startDate endDate")
       .lean<{ title: string; startDate: string; endDate: string }[]>(),
@@ -337,6 +338,9 @@ export async function getUserAttendanceHistory(userId: string, period: string | 
       .select("type status startDate endDate")
       .lean<{ type: string; status: string; startDate: Date; endDate: Date }[]>(),
     AttendanceOmission.find({ userId, date: { $gte: rangeFrom, $lte: rangeTo } })
+      .select("date")
+      .lean<{ date: string }[]>(),
+    AbsenceLeaveCover.find({ userId, date: { $gte: rangeFrom, $lte: rangeTo } })
       .select("date")
       .lean<{ date: string }[]>(),
   ]);
@@ -364,6 +368,7 @@ export async function getUserAttendanceHistory(userId: string, period: string | 
     })),
     holidays,
     omittedDates: omissions.map((item) => item.date),
+    coveredAbsentDates: absenceCovers.map((item) => item.date),
   });
 
   const lastMonthNumber = currentMonth === 1 ? 12 : currentMonth - 1;
@@ -503,7 +508,7 @@ export async function getPayableHoursForMonth(userId: string, year: number, mont
   if (joinDate && joinDate > from) from = joinDate;
   if (from > to) return 0;
 
-  const [logs, holidays, leaves, omissions, settings] = await Promise.all([
+  const [logs, holidays, leaves, omissions, absenceCovers, settings] = await Promise.all([
     Attendance.find({ userId, date: { $gte: from, $lte: to } }).lean(),
     Holiday.find({ startDate: { $lte: to }, endDate: { $gte: from } })
       .select("title startDate endDate")
@@ -517,6 +522,7 @@ export async function getPayableHoursForMonth(userId: string, year: number, mont
       .select("type status startDate endDate")
       .lean<{ type: string; status: string; startDate: Date; endDate: Date }[]>(),
     AttendanceOmission.find({ userId, date: { $gte: from, $lte: to } }).select("date").lean<{ date: string }[]>(),
+    AbsenceLeaveCover.find({ userId, date: { $gte: from, $lte: to } }).select("date").lean<{ date: string }[]>(),
     getActiveSettings(),
   ]);
 
@@ -542,9 +548,88 @@ export async function getPayableHoursForMonth(userId: string, year: number, mont
     })),
     holidays,
     omittedDates: omissions.map((item) => item.date),
+    coveredAbsentDates: absenceCovers.map((item) => item.date),
   });
 
   return report.summary.totalHours;
+}
+
+export async function setAbsenceLeaveCover(input: {
+  userId: string;
+  date: string;
+  cover: boolean;
+}): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
+  await dbConnect();
+  const { userId, date, cover } = input;
+  if (!userId || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return { ok: false, status: 400, error: "Choose an absent day to adjust." };
+  }
+  const today = getKarachiDateString();
+  if (date >= today) {
+    return { ok: false, status: 400, error: "Only a past absent day can be adjusted." };
+  }
+
+  const [year, month] = date.split("-").map((part) => Number(part));
+  const lock = await MonthlyAttendance.findOne({ userId, year, month }).select("isLocked").lean<{ isLocked?: boolean } | null>();
+  if (lock?.isLocked) {
+    return { ok: false, status: 400, error: "This month is locked." };
+  }
+
+  if (!cover) {
+    await AbsenceLeaveCover.deleteOne({ userId, date });
+    await ActivityLog.create({
+      userId,
+      activityType: "LEAVE_APPROVED",
+      date,
+      timestamp: new Date(),
+      description: `The monthly leave adjustment for ${date} was removed by Admin.`,
+    });
+    return { ok: true };
+  }
+
+  const monthStr = String(month).padStart(2, "0");
+  const from = `${year}-${monthStr}-01`;
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const to = `${year}-${monthStr}-${String(lastDay).padStart(2, "0")}`;
+  const [leaves, covers] = await Promise.all([
+    Leave.find({
+      userId,
+      status: "APPROVED",
+      startDate: { $lte: new Date(`${to}T23:59:59+05:00`) },
+      endDate: { $gte: new Date(`${from}T00:00:00+05:00`) },
+    })
+      .select("type startDate endDate")
+      .lean<{ type: string; startDate: Date; endDate: Date }[]>(),
+    AbsenceLeaveCover.find({ userId, date: { $gte: from, $lte: to } }).select("date").lean<{ date: string }[]>(),
+  ]);
+
+  let used = covers.filter((item) => item.date !== date).length * 480;
+  for (let day = 1; day <= lastDay; day += 1) {
+    const iso = `${year}-${monthStr}-${String(day).padStart(2, "0")}`;
+    if (new Date(Date.UTC(year, month - 1, day)).getUTCDay() === 0) continue;
+    const match = leaves.find((leave) => {
+      const start = new Date(leave.startDate).toISOString().slice(0, 10);
+      const end = new Date(leave.endDate).toISOString().slice(0, 10);
+      return start <= iso && end >= iso;
+    });
+    if (!match) continue;
+    const type = String(match.type || "").toUpperCase();
+    if (type === "UNPAID") continue;
+    used += type === "HALF" ? 240 : type === "EXTRA_PAID" ? 0 : 480;
+  }
+  if (used + 480 > 20 * 60) {
+    return { ok: false, status: 409, error: "This month does not have 8 unused leave hours left." };
+  }
+
+  await AbsenceLeaveCover.updateOne({ userId, date }, { $setOnInsert: { userId, date } }, { upsert: true });
+  await ActivityLog.create({
+    userId,
+    activityType: "LEAVE_APPROVED",
+    date,
+    timestamp: new Date(),
+    description: `The absent day ${date} was adjusted with unused monthly leave by Admin.`,
+  });
+  return { ok: true };
 }
 
 export type DeleteAttendanceResult =

@@ -13,6 +13,7 @@ export interface AttendanceReportRow {
   short: string;
   paid: string;
   detail: string;
+  leaveAdjusted?: boolean;
   rawExtraMinutes: number;
   rawShortMinutes: number;
 }
@@ -207,8 +208,10 @@ export function buildAttendanceReport(input: {
   leaves: ReportLeave[];
   holidays: ReportHoliday[];
   omittedDates?: string[];
+  coveredAbsentDates?: string[];
 }): AttendanceReport {
   const omitted = new Set(input.omittedDates || []);
+  const coveredAbsences = new Set(input.coveredAbsentDates || []);
   const punchByDate = new Map(input.punches.map((punch) => [punch.date, punch]));
   const [startHour, startMinute] = input.shiftStart.split(":").map((part) => Number(part) || 0);
   const graceLimit = startHour * 60 + startMinute + input.gracePeriod;
@@ -420,11 +423,14 @@ export function buildAttendanceReport(input: {
   for (const day of days) {
     if (day.rawShortMinutes < 0) continue;
     let gap = day.rawShortMinutes;
-    const fromExtra = Math.min(extraPool, gap);
+    const absentDay = day.arrival === "Absent";
+    const leaveAdjusted = absentDay && coveredAbsences.has(day.date);
+    day.leaveAdjusted = leaveAdjusted;
+    const fromExtra = absentDay ? 0 : Math.min(extraPool, gap);
     extraPool -= fromExtra;
     gap -= fromExtra;
     extraUsed += fromExtra;
-    const fromLeave = Math.min(leavePool, gap);
+    const fromLeave = absentDay && !leaveAdjusted ? 0 : Math.min(leavePool, gap);
     leavePool -= fromLeave;
     gap -= fromLeave;
     leaveCover += fromLeave;
@@ -434,7 +440,13 @@ export function buildAttendanceReport(input: {
     if (day.rawExtraMinutes) notes.push(`Extra ${formatMinutes(day.rawExtraMinutes)}`);
     if (fromExtra) notes.push(`${formatMinutes(fromExtra)} of this short day is covered by extra hours`);
     if (fromLeave) notes.push(`${formatMinutes(fromLeave)} covered by the 20-hour monthly leave`);
-    if (gap) notes.push(`Still short ${formatMinutes(gap)}. Extra hours and the monthly leave are not enough.`);
+    if (gap) {
+      notes.push(
+        absentDay
+          ? `Still short ${formatMinutes(gap)}. Unused monthly leave is not enough. Extra hours are not used for an absent day.`
+          : `Still short ${formatMinutes(gap)}. Extra hours and the monthly leave are not enough.`
+      );
+    }
     if (notes.length) day.detail = notes.join(". ");
   }
 
@@ -444,8 +456,8 @@ export function buildAttendanceReport(input: {
   );
 
   const coverNote = finalShort
-    ? `Extra hours and the 20-hour monthly leave are not enough. ${formatMinutes(finalShort)} is still short.`
-    : "Short days are covered by extra hours and the 20-hour monthly leave. No hour deduction remains.";
+    ? `${formatMinutes(finalShort)} is still short. Extra hours fill only days worked under 8 hours. Absent days use unused monthly leave.`
+    : "Days worked under 8 hours are covered by extra hours. Absent days are covered by unused monthly leave. No hour deduction remains.";
 
   return {
     from: input.from,

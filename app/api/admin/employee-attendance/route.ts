@@ -6,6 +6,7 @@ import {
   deleteAttendanceHistory,
   getDayAttendanceSheet,
   getUserAttendanceHistory,
+  setAbsenceLeaveCover,
   upsertAttendanceRecord,
 } from "@/lib/attendance-service";
 
@@ -48,6 +49,18 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
+    if (typeof body.coverAbsence === "boolean") {
+      const result = await setAbsenceLeaveCover({
+        userId: body.userId,
+        date: body.date,
+        cover: body.coverAbsence,
+      });
+      if (!result.ok) {
+        return NextResponse.json({ error: result.error }, { status: result.status });
+      }
+      return NextResponse.json({ success: true }, { status: 200 });
+    }
+
     const result = await upsertAttendanceRecord({
       userId: body.userId,
       date: body.date,

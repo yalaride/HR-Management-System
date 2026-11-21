@@ -227,6 +227,47 @@ export default function HistoryAnalytics({
     setRefreshCounter((prev) => prev + 1);
   };
 
+  const adjustAbsence = async (date: string, cover: boolean) => {
+    const result = await Swal.fire({
+      title: cover ? "Use monthly leave?" : "Remove leave adjustment?",
+      html: cover
+        ? `<b>${date}</b> will use 8 hours of unused monthly leave. It will not stay as a deduction.`
+        : `<b>${date}</b> will count as absent again.`,
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: cover ? "Use leave" : "Remove",
+      cancelButtonText: "Cancel",
+      reverseButtons: true,
+      buttonsStyling: false,
+      customClass: {
+        popup: "bg-white border border-line-subtle rounded-2xl shadow-xl p-6 font-sans text-center",
+        title: "text-base font-bold text-content-main",
+        htmlContainer: "text-xs text-content-secondary mt-2 leading-relaxed",
+        actions: "flex gap-2 justify-center mt-5 w-full",
+        confirmButton:
+          "px-4 py-2.5 bg-brand-accent hover:bg-brand-hover text-white text-xs font-bold rounded-xl transition shadow-sm cursor-pointer",
+        cancelButton:
+          "px-4 py-2.5 bg-surface-main hover:bg-line-subtle text-content-secondary text-xs font-semibold rounded-xl transition cursor-pointer",
+      },
+    });
+    if (!result.isConfirmed) return;
+    const res = await fetch("/api/admin/employee-attendance", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: selectedEmployeeId, date, coverAbsence: cover }),
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      await Swal.fire({
+        icon: "error",
+        title: "Could not adjust this day",
+        text: payload?.error || "The monthly leave could not be applied.",
+      });
+      return;
+    }
+    setRefreshCounter((prev) => prev + 1);
+  };
+
   const deleteAttendance = async (
     body: { userId: string; date: string },
     confirm: { title: string; html: string },
@@ -555,6 +596,19 @@ export default function HistoryAnalytics({
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="inline-flex items-center justify-end gap-1">
+                            {!isLocked && row.arrival === "Absent" ? (
+                              <button
+                                type="button"
+                                onClick={() => void adjustAbsence(row.date, !row.leaveAdjusted)}
+                                className={`px-2 py-1 text-[10px] font-bold rounded-lg border cursor-pointer ${
+                                  row.leaveAdjusted
+                                    ? "border-violet-200 bg-violet-50 text-violet-700"
+                                    : "border-line-subtle bg-white text-content-main"
+                                }`}
+                              >
+                                {row.leaveAdjusted ? "Undo leave" : "Use leave"}
+                              </button>
+                            ) : null}
                             {!isLocked && row.arrival !== "Holiday" && row.arrival !== "Paid leave" ? (
                               <button
                                 type="button"

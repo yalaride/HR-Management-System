@@ -84,14 +84,6 @@ export async function downloadAttendanceReport(input: AttendancePdfInput) {
   doc.setTextColor(15, 23, 42);
 
   input.report.days.forEach((row) => {
-    if (y > 190) {
-      doc.addPage();
-      header();
-      y = 30;
-      drawHead();
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(15, 23, 42);
-    }
     const values = [
       row.date,
       row.weekday,
@@ -104,18 +96,31 @@ export async function downloadAttendanceReport(input: AttendancePdfInput) {
       row.paid,
       row.detail,
     ];
+    const detailWidth = widths[widths.length - 1] - 3;
+    const detailLines = doc.splitTextToSize(String(row.detail || "—"), detailWidth);
+    const lineHeight = 3.4;
+    const rowHeight = Math.max(6.5, detailLines.length * lineHeight + 2.4);
+    if (y + rowHeight > 192) {
+      doc.addPage();
+      header();
+      y = 30;
+      drawHead();
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(15, 23, 42);
+    }
     if (row.arrival === "Holiday") doc.setFillColor(224, 242, 254);
     else if (row.arrival === "Paid leave") doc.setFillColor(237, 233, 254);
     else if (row.arrival === "Absent" || row.arrival === "Unpaid leave") doc.setFillColor(255, 228, 230);
     else doc.setFillColor(255, 255, 255);
-    doc.rect(12, y, tableWidth, 6.5, "F");
+    doc.rect(12, y, tableWidth, rowHeight, "F");
     doc.setTextColor(15, 23, 42);
     let x = 12;
-    values.forEach((value, index) => {
+    values.slice(0, -1).forEach((value, index) => {
       doc.text(String(value), x + 1.5, y + 4.5, { maxWidth: widths[index] - 3 });
       x += widths[index];
     });
-    y += 6.5;
+    doc.text(detailLines, x + 1.5, y + 4.2);
+    y += rowHeight;
   });
 
   const safeName = input.employeeName.replace(/[^\w.-]+/g, "-");
