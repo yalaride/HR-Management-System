@@ -307,6 +307,7 @@ export async function getUserAttendanceHistory(userId: string, period: string | 
   const monthStr = String(currentMonth).padStart(2, "0");
   let rangeFrom = `${currentYear}-${monthStr}-01`;
   let rangeTo = todayStr;
+  let quotaTo = `${currentYear}-${monthStr}-${String(new Date(Date.UTC(currentYear, currentMonth, 0)).getUTCDate()).padStart(2, "0")}`;
   if (period === "last-month") {
     const lastMonth = currentMonth === 1 ? 12 : currentMonth - 1;
     const lastYear = currentMonth === 1 ? currentYear - 1 : currentYear;
@@ -314,6 +315,7 @@ export async function getUserAttendanceHistory(userId: string, period: string | 
     const lastDay = new Date(Date.UTC(lastYear, lastMonth, 0)).getUTCDate();
     rangeFrom = `${lastYear}-${lastMonthStr}-01`;
     rangeTo = `${lastYear}-${lastMonthStr}-${String(lastDay).padStart(2, "0")}`;
+    quotaTo = rangeTo;
   } else if (period === "all") {
     rangeFrom = `${currentYear}-01-01`;
   }
@@ -332,7 +334,7 @@ export async function getUserAttendanceHistory(userId: string, period: string | 
     Leave.find({
       userId,
       status: "APPROVED",
-      startDate: { $lte: new Date(`${rangeTo}T23:59:59+05:00`) },
+      startDate: { $lte: new Date(`${quotaTo}T23:59:59+05:00`) },
       endDate: { $gte: new Date(`${rangeFrom}T00:00:00+05:00`) },
     })
       .select("type status startDate endDate")
@@ -340,7 +342,7 @@ export async function getUserAttendanceHistory(userId: string, period: string | 
     AttendanceOmission.find({ userId, date: { $gte: rangeFrom, $lte: rangeTo } })
       .select("date")
       .lean<{ date: string }[]>(),
-    AbsenceLeaveCover.find({ userId, date: { $gte: rangeFrom, $lte: rangeTo } })
+    AbsenceLeaveCover.find({ userId, date: { $gte: rangeFrom, $lte: quotaTo } })
       .select("date")
       .lean<{ date: string }[]>(),
   ]);
@@ -577,6 +579,16 @@ export async function setAbsenceLeaveCover(input: {
 
   if (!cover) {
     await AbsenceLeaveCover.deleteOne({ userId, date });
+    const dayStart = new Date(`${date}T00:00:00.000Z`);
+    const dayEnd = new Date(`${date}T00:00:00.000Z`);
+    dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
+    await Leave.deleteMany({
+      userId,
+      type: "FULL",
+      status: "APPROVED",
+      reason: "Adjusted from an absent day by Admin.",
+      startDate: { $gte: dayStart, $lt: dayEnd },
+    });
     await ActivityLog.create({
       userId,
       activityType: "LEAVE_APPROVED",
@@ -618,9 +630,24 @@ export async function setAbsenceLeaveCover(input: {
     used += type === "HALF" ? 240 : type === "EXTRA_PAID" ? 0 : 480;
   }
   if (used + 480 > 20 * 60) {
-    return { ok: false, status: 409, error: "This month does not have 8 unused leave hours left." };
+    return { ok: false, status: 409, error: "This month does not have a full day of leave left." };
   }
 
+  const employee = await Employee.findOne({ userId })
+    .select("name designation")
+    .lean<{ name?: string; designation?: string } | null>();
+  const dayStart = new Date(`${date}T00:00:00.000Z`);
+  await Leave.create({
+    userId,
+    employeeName: employee?.name || "Employee",
+    designation: employee?.designation || "",
+    type: "FULL",
+    startDate: dayStart,
+    endDate: dayStart,
+    days: 1,
+    reason: "Adjusted from an absent day by Admin.",
+    status: "APPROVED",
+  });
   await AbsenceLeaveCover.updateOne({ userId, date }, { $setOnInsert: { userId, date } }, { upsert: true });
   await ActivityLog.create({
     userId,

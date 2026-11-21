@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
 import Leave from "@/modals/LeaveRequest";
+import { AbsenceLeaveCover } from "@/modals/AbsenceLeaveCover";
 import { Employee } from "@/modals/Employee";
 import { ActivityLog } from "@/modals/ActivityLog";
 import { getSessionUser } from "@/lib/auth";
@@ -68,12 +69,35 @@ export async function POST(request: Request) {
     if (!employee) return NextResponse.json({ error: "Employee not found." }, { status: 404 });
 
     const existingLeaves = await Leave.find({ userId: body.userId }).select("type status startDate endDate").lean();
-    const existing: QuotaLeave[] = existingLeaves.map((leave) => ({
+    const covers = await AbsenceLeaveCover.find({ userId: body.userId }).select("date").lean<{ date: string }[]>();
+    const mapped: QuotaLeave[] = existingLeaves.map((leave) => ({
       type: String(leave.type || ""),
       status: String(leave.status || ""),
       startDate: isoDate(leave.startDate),
       endDate: isoDate(leave.endDate),
     }));
+    const existing: QuotaLeave[] = [
+      ...mapped,
+      ...covers
+        .filter((cover) => {
+          return !mapped.some((leave) => {
+            const status = leave.status.toUpperCase();
+            const type = leave.type.toUpperCase();
+            return (
+              (status === "PENDING" || status === "APPROVED") &&
+              (type === "FULL" || type === "URGENT") &&
+              leave.startDate <= cover.date &&
+              leave.endDate >= cover.date
+            );
+          });
+        })
+        .map((cover) => ({
+          type: "FULL",
+          status: "APPROVED",
+          startDate: cover.date,
+          endDate: cover.date,
+        })),
+    ];
     const checked = validateGrantedLeave({
       kind: kind as "URGENT" | "EXTRA_PAID",
       start: body.startDate,

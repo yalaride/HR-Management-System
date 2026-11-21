@@ -596,17 +596,22 @@ export default function HistoryAnalytics({
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="inline-flex items-center justify-end gap-1">
-                            {!isLocked && row.arrival === "Absent" ? (
+                            {!isLocked && row.leaveAdjusted ? (
                               <button
                                 type="button"
-                                onClick={() => void adjustAbsence(row.date, !row.leaveAdjusted)}
-                                className={`px-2 py-1 text-[10px] font-bold rounded-lg border cursor-pointer ${
-                                  row.leaveAdjusted
-                                    ? "border-violet-200 bg-violet-50 text-violet-700"
-                                    : "border-line-subtle bg-white text-content-main"
-                                }`}
+                                onClick={() => void adjustAbsence(row.date, false)}
+                                className="px-2 py-1 text-[10px] font-bold rounded-lg border cursor-pointer border-violet-200 bg-violet-50 text-violet-700"
                               >
-                                {row.leaveAdjusted ? "Undo leave" : "Use leave"}
+                                Undo leave
+                              </button>
+                            ) : null}
+                            {!isLocked && row.arrival === "Absent" && (row.fullDaysRemaining ?? 0) > 0 ? (
+                              <button
+                                type="button"
+                                onClick={() => void adjustAbsence(row.date, true)}
+                                className="px-2 py-1 text-[10px] font-bold rounded-lg border cursor-pointer border-line-subtle bg-white text-content-main"
+                              >
+                                Use leave
                               </button>
                             ) : null}
                             {!isLocked && row.arrival !== "Holiday" && row.arrival !== "Paid leave" ? (

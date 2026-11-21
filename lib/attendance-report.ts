@@ -14,6 +14,7 @@ export interface AttendanceReportRow {
   paid: string;
   detail: string;
   leaveAdjusted?: boolean;
+  fullDaysRemaining?: number;
   rawExtraMinutes: number;
   rawShortMinutes: number;
 }
@@ -33,6 +34,7 @@ export interface AttendanceReportSummary {
   absentDays: number;
   leaveDays: number;
   holidayDays: number;
+  fullDaysRemaining: number;
   coverNote: string;
 }
 
@@ -311,7 +313,10 @@ export function buildAttendanceReport(input: {
         worked: "—",
         short: "—",
         paid: "8 hrs 0 mins",
-        detail: "Paid leave · no deduction",
+        detail: coveredAbsences.has(date)
+          ? "Adjusted with monthly leave · no deduction"
+          : "Paid leave · no deduction",
+        leaveAdjusted: coveredAbsences.has(date),
         ...blankHours(),
       });
       continue;
@@ -469,6 +474,25 @@ export function buildAttendanceReport(input: {
     if (notes.length) day.detail = notes.join(". ");
   }
 
+  const usedFullDays = new Map<string, Set<string>>();
+  const addFullDay = (date: string) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || weekdayIndex(date) === 0) return;
+    const month = date.slice(0, 7);
+    const dates = usedFullDays.get(month) || new Set<string>();
+    dates.add(date);
+    usedFullDays.set(month, dates);
+  };
+  for (const leave of input.leaves) {
+    const status = leave.status.toUpperCase();
+    const type = leave.type.toUpperCase();
+    if (status !== "APPROVED" && status !== "PENDING") continue;
+    if (type !== "FULL" && type !== "URGENT") continue;
+    for (const date of eachDate(leave.startDate, leave.endDate)) addFullDay(date);
+  }
+  for (const date of coveredAbsences) addFullDay(date);
+  for (const day of days) {
+    day.fullDaysRemaining = Math.max(0, 2 - (usedFullDays.get(day.date.slice(0, 7))?.size || 0));
+  }
   const rawShortMinutes = days.reduce(
     (sum, day) => sum + Math.max(0, day.rawShortMinutes),
     0
@@ -497,6 +521,7 @@ export function buildAttendanceReport(input: {
       absentDays,
       leaveDays,
       holidayDays,
+      fullDaysRemaining: days[0]?.fullDaysRemaining ?? 2,
       coverNote,
     },
   };

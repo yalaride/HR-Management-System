@@ -5,6 +5,7 @@ import { getServerSession } from "next-auth";
 import connectDB from "@/lib/mongodb";
 import { authOptions } from "@/lib/auth";
 import Leave from "@/modals/LeaveRequest";
+import { AbsenceLeaveCover } from "@/modals/AbsenceLeaveCover";
 import { Employee } from "@/modals/Employee";
 import { ActivityLog } from "@/modals/ActivityLog";
 import {
@@ -62,6 +63,7 @@ export async function GET() {
     const canUseLeave = ["permanent", "contract"].includes(employmentType.toLowerCase());
 
     const leaves = await Leave.find({ userId }).sort({ createdAt: -1 }).lean();
+    const covers = await AbsenceLeaveCover.find({ userId }).select("date").lean<{ date: string }[]>();
     const formattedLeaves = leaves.map((leave) => ({
       id: String(leave._id),
       type: String(leave.type || "").toUpperCase(),
@@ -71,6 +73,27 @@ export async function GET() {
       reason: String(leave.reason || ""),
       status: String(leave.status || "PENDING").toUpperCase(),
     }));
+    for (const cover of covers) {
+      const alreadyListed = formattedLeaves.some((leave) => {
+        const type = leave.type.toUpperCase();
+        return (
+          (leave.status === "PENDING" || leave.status === "APPROVED") &&
+          (type === "FULL" || type === "URGENT") &&
+          leave.startDate <= cover.date &&
+          leave.endDate >= cover.date
+        );
+      });
+      if (alreadyListed) continue;
+      formattedLeaves.push({
+        id: `absence-${cover.date}`,
+        type: "FULL",
+        startDate: cover.date,
+        endDate: cover.date,
+        days: 1,
+        reason: "Adjusted from an absent day by Admin.",
+        status: "APPROVED",
+      });
+    }
 
     const today = karachiToday();
     const currentMonth = monthKey(today);
@@ -157,12 +180,35 @@ export async function POST(request: Request) {
 
     const today = karachiToday();
     const existingLeaves = await Leave.find({ userId }).select("type status startDate endDate").lean();
-    const existing: QuotaLeave[] = existingLeaves.map((leave) => ({
+    const covers = await AbsenceLeaveCover.find({ userId }).select("date").lean<{ date: string }[]>();
+    const mappedLeaves: QuotaLeave[] = existingLeaves.map((leave) => ({
       type: String(leave.type || ""),
       status: String(leave.status || ""),
       startDate: formatDate(leave.startDate),
       endDate: formatDate(leave.endDate),
     }));
+    const existing: QuotaLeave[] = [
+      ...mappedLeaves,
+      ...covers
+        .filter((cover) => {
+          return !mappedLeaves.some((leave) => {
+            const status = leave.status.toUpperCase();
+            const type = leave.type.toUpperCase();
+            return (
+              (status === "PENDING" || status === "APPROVED") &&
+              (type === "FULL" || type === "URGENT") &&
+              leave.startDate <= cover.date &&
+              leave.endDate >= cover.date
+            );
+          });
+        })
+        .map((cover) => ({
+          type: "FULL",
+          status: "APPROVED",
+          startDate: cover.date,
+          endDate: cover.date,
+        })),
+    ];
     const checked = validateEmployeeLeave({
       kind: type as "FULL" | "HALF",
       start: body.startDate,
