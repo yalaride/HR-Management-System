@@ -1,4 +1,5 @@
 import type { AttendanceReport } from "@/lib/attendance-report";
+import { formatMinutes } from "@/lib/attendance-report";
 
 interface AttendancePdfInput {
   employeeName: string;
@@ -35,7 +36,7 @@ export async function downloadAttendanceReport(input: AttendancePdfInput) {
     ["Extra", `${summary.extraHours} hrs`],
     ["Holiday", `${summary.holidayHours} hrs`],
     ["Leave", `${summary.leaveHours} hrs`],
-    ["Short", `${summary.shortHours} hrs`],
+    ["Short", formatMinutes(Math.round(summary.shortHours * 60))],
     ["Payable", `${summary.totalHours} hrs`],
   ];
   cards.forEach((card, index) => {
@@ -62,9 +63,11 @@ export async function downloadAttendanceReport(input: AttendancePdfInput) {
   const widths = [22, 18, 22, 22, 22, 24, 22, 22, 22, 72];
   let y = 52 + noteLines.length * 4;
 
+  const tableWidth = widths.reduce((sum, width) => sum + width, 0);
+
   const drawHead = () => {
     doc.setFillColor(241, 245, 249);
-    doc.rect(12, y, widths.reduce((sum, width) => sum + width, 0), 7, "F");
+    doc.rect(12, y, tableWidth, 7, "F");
     doc.setFont("helvetica", "bold");
     doc.setFontSize(7.5);
     doc.setTextColor(71, 85, 105);
@@ -101,6 +104,12 @@ export async function downloadAttendanceReport(input: AttendancePdfInput) {
       row.paid,
       row.detail,
     ];
+    if (row.arrival === "Holiday") doc.setFillColor(224, 242, 254);
+    else if (row.arrival === "Paid leave") doc.setFillColor(237, 233, 254);
+    else if (row.arrival === "Absent" || row.arrival === "Unpaid leave") doc.setFillColor(255, 228, 230);
+    else doc.setFillColor(255, 255, 255);
+    doc.rect(12, y, tableWidth, 6.5, "F");
+    doc.setTextColor(15, 23, 42);
     let x = 12;
     values.forEach((value, index) => {
       doc.text(String(value), x + 1.5, y + 4.5, { maxWidth: widths[index] - 3 });

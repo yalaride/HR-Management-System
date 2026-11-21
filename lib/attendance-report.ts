@@ -430,7 +430,6 @@ export function buildAttendanceReport(input: {
     leaveCover += fromLeave;
     paidMinutes += fromExtra + fromLeave;
     finalShort += gap;
-    day.short = displayShort(gap);
     const notes: string[] = [];
     if (day.rawExtraMinutes) notes.push(`Extra ${formatMinutes(day.rawExtraMinutes)}`);
     if (fromExtra) notes.push(`${formatMinutes(fromExtra)} of this short day is covered by extra hours`);
@@ -438,6 +437,11 @@ export function buildAttendanceReport(input: {
     if (gap) notes.push(`Still short ${formatMinutes(gap)}. Extra hours and the monthly leave are not enough.`);
     if (notes.length) day.detail = notes.join(". ");
   }
+
+  const rawShortMinutes = days.reduce(
+    (sum, day) => sum + Math.max(0, day.rawShortMinutes),
+    0
+  );
 
   const coverNote = finalShort
     ? `Extra hours and the 20-hour monthly leave are not enough. ${formatMinutes(finalShort)} is still short.`
@@ -456,7 +460,7 @@ export function buildAttendanceReport(input: {
       extraHours: hoursFromMinutes(extraEarned),
       extraUsedHours: hoursFromMinutes(extraUsed),
       leaveCoverHours: hoursFromMinutes(leaveCover),
-      shortHours: hoursFromMinutes(finalShort),
+      shortHours: hoursFromMinutes(rawShortMinutes),
       totalHours: hoursFromMinutes(attendedMinutes + paidMinutes),
       lateDays,
       absentDays,

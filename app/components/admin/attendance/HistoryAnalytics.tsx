@@ -5,7 +5,7 @@ import { TrendingUp, ChevronDown, Lock, Edit2, Trash2 } from "lucide-react";
 import Swal from "sweetalert2";
 import RetroLogModal from "./RetroLogModal";
 import { downloadAttendanceReport } from "./attendanceReportPdf";
-import type { AttendanceReport } from "@/lib/attendance-report";
+import { formatMinutes, type AttendanceReport } from "@/lib/attendance-report";
 
 function karachiMonthLabel(offsetMonths: number): string {
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -449,7 +449,7 @@ export default function HistoryAnalytics({
                 </div>
                 <div className="bg-slate-50 p-2 border border-slate-100 rounded-xl">
                   <div className="text-[9px] font-extrabold text-rose-800 uppercase">Short</div>
-                  <div className="text-base font-black text-rose-600 mt-0.5">{report?.summary.shortHours ?? 0} hrs</div>
+                  <div className="text-base font-black text-rose-600 mt-0.5">{formatMinutes(Math.round((report?.summary.shortHours ?? 0) * 60))}</div>
                 </div>
                 <div className="bg-slate-50 p-2 border border-slate-100 rounded-xl">
                   <div className="text-[9px] font-extrabold text-indigo-800 uppercase">Total payable</div>
