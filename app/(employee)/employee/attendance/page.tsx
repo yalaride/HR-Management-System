@@ -20,31 +20,35 @@ interface AttendanceRecord {
   status: "On Time" | "Late" | "Absent";
 }
 
-function ClockWidget() {
-  const [currentTime, setCurrentTime] = useState<string>("--:--:--");
+function formatElapsed(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const seconds = total % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function useSessionElapsed(checkIn?: string | null, checkOut?: string | null): string {
+  const [label, setLabel] = useState("00:00:00");
 
   useEffect(() => {
-    const updateTime = () => {
-      const nowStr = new Intl.DateTimeFormat("en-US", {
-        timeZone: "Asia/Karachi",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hour12: true,
-      }).format(new Date());
-      setCurrentTime(nowStr);
+    const start = checkIn ? new Date(checkIn).getTime() : NaN;
+    if (!checkIn || Number.isNaN(start)) {
+      setLabel("00:00:00");
+      return;
+    }
+    const fixedEnd = checkOut ? new Date(checkOut).getTime() : NaN;
+    const tick = () => {
+      const end = Number.isNaN(fixedEnd) ? Date.now() : fixedEnd;
+      setLabel(formatElapsed(end - start));
     };
-
-    updateTime();
-    const timer = setInterval(updateTime, 1000);
+    tick();
+    if (!Number.isNaN(fixedEnd)) return;
+    const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [checkIn, checkOut]);
 
-  return (
-    <span className="text-sm font-bold text-content-main tabular-nums">
-      {currentTime}
-    </span>
-  );
+  return label;
 }
 
 export default function EmployeeAttendancePage() {
@@ -61,6 +65,8 @@ export default function EmployeeAttendancePage() {
   }>("/api/employee/attendance");
 
   const todayRecord = attendanceData?.todayRecord || null;
+  const sessionElapsed = useSessionElapsed(todayRecord?.checkIn, todayRecord?.checkOut);
+  const sessionRunning = Boolean(todayRecord?.checkIn && !todayRecord?.checkOut);
   const history = useMemo(() => {
     const rows = attendanceData?.history || [];
     return [...rows].sort((a, b) => b.date.localeCompare(a.date));
@@ -138,8 +144,8 @@ export default function EmployeeAttendancePage() {
         </div>
 
         <div className="flex items-center gap-3 bg-surface-card border border-line-subtle py-2 px-4 rounded-xl shadow-xs shrink-0 self-start sm:self-auto">
-          <Clock className="w-4 h-4 text-brand-accent animate-pulse" />
-          <ClockWidget />
+          <Clock className={`w-4 h-4 text-brand-accent ${sessionRunning ? "animate-pulse" : ""}`} />
+          <span className="text-sm font-bold text-content-main tabular-nums">{sessionElapsed}</span>
         </div>
       </div>
 
@@ -199,7 +205,7 @@ export default function EmployeeAttendancePage() {
                 <Timer className="w-3.5 h-3.5 text-content-muted" /> Today&apos;s Session
               </span>
               <span className="text-xs font-bold text-content-main">
-                {todayRecord?.status === "Absent" ? "0 hrs 0 mins" : todayRecord?.formattedDuration || "0 hrs 0 mins"}
+                {todayRecord?.checkIn ? sessionElapsed : "0 hrs 0 mins"}
               </span>
             </div>
             <div className="flex items-center justify-between border-b border-line-subtle pb-2.5">

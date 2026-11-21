@@ -436,8 +436,12 @@ export default function HistoryAnalytics({
                   <div className="text-base font-black text-emerald-600 mt-0.5">{report?.summary.attendedHours ?? stats.totalHours ?? 0} hrs</div>
                 </div>
                 <div className="bg-slate-50 p-2 border border-slate-100 rounded-xl">
-                  <div className="text-[9px] font-extrabold text-sky-800 uppercase">Paid hours</div>
-                  <div className="text-base font-black text-sky-600 mt-0.5">{report?.summary.paidHours ?? 0} hrs</div>
+                  <div className="text-[9px] font-extrabold text-sky-800 uppercase">Holiday</div>
+                  <div className="text-base font-black text-sky-600 mt-0.5">{report?.summary.holidayHours ?? 0} hrs</div>
+                </div>
+                <div className="bg-slate-50 p-2 border border-slate-100 rounded-xl">
+                  <div className="text-[9px] font-extrabold text-violet-800 uppercase">Leave</div>
+                  <div className="text-base font-black text-violet-600 mt-0.5">{report?.summary.leaveHours ?? 0} hrs</div>
                 </div>
                 <div className="bg-slate-50 p-2 border border-slate-100 rounded-xl">
                   <div className="text-[9px] font-extrabold text-indigo-800 uppercase">Extra</div>

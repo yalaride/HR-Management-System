@@ -11,7 +11,6 @@ import {
   CalendarPlus, 
   X, 
   CheckCircle2,
-  CalendarDays,
   CalendarOff,
   ChevronDown,
   UserMinus,
@@ -25,7 +24,39 @@ import BirthdayGreetingBanner from "@/app/components/employee/dashbord/BirthdayG
 import { formatHolidayDate } from "@/lib/holiday-announcement";
 
 interface TodayAttendanceRecord {
-  checkOut?: string;
+  checkIn?: string | null;
+  checkOut?: string | null;
+}
+
+function formatElapsed(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const seconds = total % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function SessionTimer({ checkIn, checkOut }: { checkIn?: string | null; checkOut?: string | null }) {
+  const [label, setLabel] = useState("00:00:00");
+
+  useEffect(() => {
+    const start = checkIn ? new Date(checkIn).getTime() : NaN;
+    if (!checkIn || Number.isNaN(start)) {
+      setLabel("00:00:00");
+      return;
+    }
+    const fixedEnd = checkOut ? new Date(checkOut).getTime() : NaN;
+    const tick = () => {
+      const end = Number.isNaN(fixedEnd) ? Date.now() : fixedEnd;
+      setLabel(formatElapsed(end - start));
+    };
+    tick();
+    if (!Number.isNaN(fixedEnd)) return;
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }, [checkIn, checkOut]);
+
+  return <span className="text-xs font-semibold text-content-secondary tabular-nums">{label}</span>;
 }
 
 interface AttendanceHistoryEntry {
@@ -43,43 +74,6 @@ const swalCustomClass = {
   htmlContainer: "text-xs text-content-secondary",
   confirmButton: "px-4.5 py-2.5 text-xs font-bold rounded-xl text-white bg-brand-accent hover:bg-brand-hover border-none outline-none cursor-pointer transition",
 };
-
-function DynamicHeaderClock() {
-  const [currentDateTime, setCurrentDateTime] = useState<Date | null>(null);
-
-  useEffect(() => {
-    const initial = setTimeout(() => setCurrentDateTime(new Date()), 0);
-    const interval = setInterval(() => {
-      setCurrentDateTime(new Date());
-    }, 1000);
-    return () => {
-      clearTimeout(initial);
-      clearInterval(interval);
-    };
-  }, []);
-
-  if (!currentDateTime) {
-    return <span className="text-xs font-semibold text-content-muted">Loading time...</span>;
-  }
-
-  return (
-    <span className="text-xs font-semibold text-content-secondary tabular-nums">
-      {currentDateTime.toLocaleDateString("en-US", {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-        year: "numeric"
-      })}{" "}
-      •{" "}
-      {currentDateTime.toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hour12: true
-      })}
-    </span>
-  );
-}
 
 export default function EmployeeDashboardPage() {
   const { data: session } = useSession();
@@ -265,8 +259,8 @@ export default function EmployeeDashboardPage() {
         </div>
 
         <div className="self-start md:self-center inline-flex items-center gap-2 px-3.5 py-2 bg-surface-card border border-line-subtle rounded-xl text-xs font-semibold shadow-xs">
-          <CalendarDays className="w-4 h-4 text-brand-accent" />
-          <DynamicHeaderClock />
+          <Clock className={`w-4 h-4 text-brand-accent ${todayRecord?.checkIn && !todayRecord?.checkOut ? "animate-pulse" : ""}`} />
+          <SessionTimer checkIn={todayRecord?.checkIn} checkOut={todayRecord?.checkOut} />
         </div>
       </div>
 

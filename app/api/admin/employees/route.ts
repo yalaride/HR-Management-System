@@ -110,6 +110,13 @@ export async function GET() {
           : null,
         extensions: emp.extensions || [],
         deviceUserNo: emp.deviceUserNo || "",
+        phoneNumber: emp.phoneNumber || "",
+        address: emp.address || "",
+        dateOfBirth: emp.dateOfBirth ? new Date(emp.dateOfBirth).toISOString() : null,
+        gender: emp.gender || "",
+        maritalStatus: emp.maritalStatus || "",
+        emergencyContactName: emp.emergencyContactName || "",
+        emergencyContactPhone: emp.emergencyContactPhone || "",
         profileCompletion: getProfileCompletion(emp).percent,
       };
     });

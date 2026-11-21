@@ -195,12 +195,16 @@ export async function downloadPayslipPdf({
   employeeRole,
   formatCurrency = defaultFormatCurrency,
   companyDetails,
+  mode = "download",
+  preview = null,
 }: {
   slip: PayslipRecord;
   employeeName: string;
   employeeRole: string;
   formatCurrency?: (amount: number) => string;
   companyDetails?: PayslipCompanyDetails | null;
+  mode?: "download" | "view";
+  preview?: Window | null;
 }) {
   const { jsPDF } = await import("jspdf");
 
@@ -612,5 +616,14 @@ export async function downloadPayslipPdf({
   );
 
   const cleanFileName = `Payslip_${employeeName.replace(/\s+/g, "_")}_${slip.period.replace(/\s+/g, "_")}_${refId}.pdf`;
+  if (mode === "view") {
+    const url = String(doc.output("bloburl"));
+    if (preview && !preview.closed) {
+      preview.location.href = url;
+    } else {
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
+    return;
+  }
   doc.save(cleanFileName);
 }

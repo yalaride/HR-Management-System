@@ -72,6 +72,13 @@ export interface Employee {
   confirmationDate?: string | null;
   extensions?: ExtensionRecord[];
   deviceUserNo?: string;
+  phoneNumber?: string;
+  address?: string;
+  dateOfBirth?: string | null;
+  gender?: string;
+  maritalStatus?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
   profileCompletion?: number;
 }
 

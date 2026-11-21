@@ -21,6 +21,8 @@ export interface AttendanceReportSummary {
   workingDays: number;
   attendedHours: number;
   paidHours: number;
+  holidayHours: number;
+  leaveHours: number;
   extraHours: number;
   extraUsedHours: number;
   leaveCoverHours: number;
@@ -214,6 +216,8 @@ export function buildAttendanceReport(input: {
   const days: AttendanceReportRow[] = [];
   let attendedMinutes = 0;
   let paidMinutes = 0;
+  let holidayMinutes = 0;
+  let leaveMinutes = 0;
   let allowanceUsedMinutes = 0;
   let lateDays = 0;
   let absentDays = 0;
@@ -233,6 +237,7 @@ export function buildAttendanceReport(input: {
     if (holiday) {
       const extra = completed ? Math.max(0, completed.worked - REQUIRED_DAY_MINUTES) : 0;
       holidayDays += 1;
+      holidayMinutes += REQUIRED_DAY_MINUTES;
       paidMinutes += REQUIRED_DAY_MINUTES;
       days.push({
         date,
@@ -267,6 +272,7 @@ export function buildAttendanceReport(input: {
       const extra = Math.max(0, worked - countedWork);
       const short = Math.max(0, REQUIRED_DAY_MINUTES - countedWork - paid);
       leaveDays += 1;
+      leaveMinutes += paid;
       allowanceUsedMinutes += paid;
       attendedMinutes += countedWork;
       paidMinutes += paid;
@@ -289,6 +295,7 @@ export function buildAttendanceReport(input: {
 
     if (leave && isPaidLeave(leave.type) && !completed) {
       leaveDays += 1;
+      leaveMinutes += REQUIRED_DAY_MINUTES;
       const countsTowardAllowance = leave.type.toUpperCase() !== "EXTRA_PAID";
       if (countsTowardAllowance) allowanceUsedMinutes += REQUIRED_DAY_MINUTES;
       paidMinutes += REQUIRED_DAY_MINUTES;
@@ -444,6 +451,8 @@ export function buildAttendanceReport(input: {
       workingDays: days.length,
       attendedHours: hoursFromMinutes(attendedMinutes),
       paidHours: hoursFromMinutes(paidMinutes),
+      holidayHours: hoursFromMinutes(holidayMinutes),
+      leaveHours: hoursFromMinutes(leaveMinutes),
       extraHours: hoursFromMinutes(extraEarned),
       extraUsedHours: hoursFromMinutes(extraUsed),
       leaveCoverHours: hoursFromMinutes(leaveCover),

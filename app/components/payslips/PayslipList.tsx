@@ -2,7 +2,7 @@
 
 import React from "react";
 import Swal from "sweetalert2";
-import { Calendar, CheckCircle2, Download, AlertCircle, Trash2, Loader2 } from "lucide-react";
+import { Calendar, CheckCircle2, Download, Eye, AlertCircle, Trash2, Loader2 } from "lucide-react";
 import { downloadPayslipPdf, getPayslipReferenceId, PayslipRecord } from "./payslipPdf";
 
 export interface ExtendedPayslipRecord extends PayslipRecord {
@@ -84,11 +84,14 @@ export default function PayslipList({
   deletingId = null,
 }: PayslipListProps): React.JSX.Element {
   
-  const handleDownload = async (slip: PayslipRecord) => {
-    if (onDownloadStart) onDownloadStart(slip._id);
+  const [openingId, setOpeningId] = React.useState<string | null>(null);
+
+  const handlePayslip = async (slip: PayslipRecord, mode: "view" | "download") => {
+    const preview = mode === "view" ? window.open("", "_blank") : null;
+    if (mode === "view") setOpeningId(slip._id);
+    if (mode === "download" && onDownloadStart) onDownloadStart(slip._id);
 
     try {
-      // Fetch dynamic details for this precise payslip ID using a query parameter
       const res = await fetch(`/api/admin/payslips?id=${slip._id}`);
       if (!res.ok) {
         throw new Error(`Server returned status: ${res.status}`);
@@ -96,33 +99,35 @@ export default function PayslipList({
 
       const { payslip: freshSlip, companyDetails: freshCompanyDetails } = await res.json();
 
-      const employeeObj = typeof freshSlip.employeeId === "object" && freshSlip.employeeId !== null 
-        ? freshSlip.employeeId 
+      const employeeObj = typeof freshSlip.employeeId === "object" && freshSlip.employeeId !== null
+        ? freshSlip.employeeId
         : null;
-      
+
       const employeeName = employeeObj?.name || freshSlip.employeeName || "Unknown Employee";
       const employeeRole = employeeObj?.jobTitle || freshSlip.employeeRole || "No Specified Title";
 
-      // Call PDF compiler with database values
       await downloadPayslipPdf({
         slip: freshSlip,
         employeeName,
         employeeRole,
         formatCurrency,
-        companyDetails: freshCompanyDetails || companyDetails, 
+        companyDetails: freshCompanyDetails || companyDetails,
+        mode,
+        preview,
       });
-
     } catch (error) {
+      preview?.close();
       console.error("Failed to generate PDF:", error);
       Swal.fire({
         icon: "error",
-        title: "Compilation Failed",
+        title: mode === "view" ? "Could not open payslip" : "Compilation Failed",
         text: "Could not generate your receipt. Please verify your database connection and try again.",
         confirmButtonColor: "#7c3aed",
         customClass: swalCustomClass
       });
     } finally {
-      if (onDownloadEnd) onDownloadEnd(slip._id);
+      if (mode === "view") setOpeningId(null);
+      if (mode === "download" && onDownloadEnd) onDownloadEnd(slip._id);
     }
   };
 
@@ -212,6 +217,7 @@ export default function PayslipList({
                   .toUpperCase();
 
                 const isCurrentlyDownloading = downloadingId === slip._id;
+                const isCurrentlyOpening = openingId === slip._id;
                 const isCurrentlyDeleting = deletingId === slip._id;
 
                 return (
@@ -350,8 +356,25 @@ export default function PayslipList({
                     <td className="px-6 py-4 text-right">
                       <div className="inline-flex items-center justify-end gap-1.5">
                         <button
-                          onClick={() => handleDownload(slip)}
-                          disabled={isCurrentlyDownloading || isCurrentlyDeleting}
+                          onClick={() => handlePayslip(slip, "view")}
+                          disabled={isCurrentlyDownloading || isCurrentlyDeleting || isCurrentlyOpening}
+                          className="btn-table-download bg-surface-card hover:bg-surface-main text-content-main border-line-subtle cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isCurrentlyOpening ? (
+                            <>
+                              <div className="w-3.5 h-3.5 border-2 border-content-muted border-t-transparent rounded-full animate-spin" />
+                              <span>Opening...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>View</span>
+                            </>
+                          )}
+                        </button>
+                        <button
+                          onClick={() => handlePayslip(slip, "download")}
+                          disabled={isCurrentlyDownloading || isCurrentlyDeleting || isCurrentlyOpening}
                           className={`btn-table-download ${
                             isCurrentlyDownloading
                               ? "bg-surface-main text-content-muted border-line-subtle cursor-not-allowed"
@@ -374,7 +397,7 @@ export default function PayslipList({
                         {onDelete && (
                           <button
                             onClick={() => onDelete(slip)}
-                            disabled={isCurrentlyDeleting || isCurrentlyDownloading}
+                            disabled={isCurrentlyDeleting || isCurrentlyDownloading || isCurrentlyOpening}
                             title="Delete payslip"
                             className="p-2 rounded-lg border border-transparent text-content-muted hover:text-rose-600 hover:bg-rose-50 hover:border-rose-100 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                           >

@@ -33,14 +33,15 @@ export async function downloadAttendanceReport(input: AttendancePdfInput) {
   const cards = [
     ["Attended", `${summary.attendedHours} hrs`],
     ["Extra", `${summary.extraHours} hrs`],
-    ["Paid", `${summary.paidHours} hrs`],
+    ["Holiday", `${summary.holidayHours} hrs`],
+    ["Leave", `${summary.leaveHours} hrs`],
     ["Short", `${summary.shortHours} hrs`],
     ["Payable", `${summary.totalHours} hrs`],
   ];
   cards.forEach((card, index) => {
-    const x = 12 + index * 55;
+    const x = 12 + index * 46;
     doc.setDrawColor(226, 232, 240);
-    doc.roundedRect(x, 28, 52, 16, 2, 2);
+    doc.roundedRect(x, 28, 43, 16, 2, 2);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.setTextColor(100, 116, 139);

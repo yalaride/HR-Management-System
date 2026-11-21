@@ -283,6 +283,54 @@ export default function ViewEmployeeModal({
             </div>
           </div>
 
+          <div className="space-y-2.5">
+            <h4 className="text-xs font-bold text-slate-900">Profile details</h4>
+            <div className="grid grid-cols-2 gap-3.5 p-3.5 bg-slate-50/70 border border-slate-150 rounded-xl text-xs">
+              <div>
+                <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 block">
+                  Phone
+                </span>
+                <span className="font-semibold text-slate-700">{employee.phoneNumber || "—"}</span>
+              </div>
+              <div>
+                <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 block">
+                  Date of birth
+                </span>
+                <span className="font-semibold text-slate-700">{formatDate(employee.dateOfBirth)}</span>
+              </div>
+              <div>
+                <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 block">
+                  Gender
+                </span>
+                <span className="font-semibold text-slate-700">{employee.gender || "—"}</span>
+              </div>
+              <div>
+                <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 block">
+                  Marital status
+                </span>
+                <span className="font-semibold text-slate-700">{employee.maritalStatus || "—"}</span>
+              </div>
+              <div className="col-span-2">
+                <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 block">
+                  Address
+                </span>
+                <span className="font-semibold text-slate-700">{employee.address || "—"}</span>
+              </div>
+              <div>
+                <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 block">
+                  Emergency contact
+                </span>
+                <span className="font-semibold text-slate-700">{employee.emergencyContactName || "—"}</span>
+              </div>
+              <div>
+                <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 block">
+                  Emergency phone
+                </span>
+                <span className="font-semibold text-slate-700">{employee.emergencyContactPhone || "—"}</span>
+              </div>
+            </div>
+          </div>
+
           {/* EXTENSION HISTORY & REASONS LOG */}
           <div className="space-y-2.5">
             <div className="flex items-center justify-between">
