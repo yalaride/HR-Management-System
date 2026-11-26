@@ -577,6 +577,8 @@ export default function HistoryAnalytics({
                     if (row.arrival === "Absent" || row.arrival === "Unpaid leave") badgeStyle = "bg-rose-50 text-rose-700 border-rose-100";
                     if (row.arrival === "Holiday" || row.arrival === "Paid leave") badgeStyle = "bg-sky-50 text-sky-700 border-sky-100";
 
+                    const adjusted =
+                      row.leaveAdjusted || row.detail.startsWith("Adjusted with monthly leave");
                     return (
                       <tr key={row.date} className="hover:bg-slate-50/50 transition">
                         <td className="px-6 py-4 font-black text-content-main">{row.date}</td>
@@ -596,7 +598,7 @@ export default function HistoryAnalytics({
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="inline-flex items-center justify-end gap-1">
-                            {!isLocked && row.leaveAdjusted ? (
+                            {!isLocked && adjusted ? (
                               <button
                                 type="button"
                                 onClick={() => void adjustAbsence(row.date, false)}

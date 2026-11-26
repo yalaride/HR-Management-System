@@ -316,8 +316,8 @@ export function buildAttendanceReport(input: {
         detail: coveredAbsences.has(date)
           ? "Adjusted with monthly leave · no deduction"
           : "Paid leave · no deduction",
-        leaveAdjusted: coveredAbsences.has(date),
         ...blankHours(),
+        leaveAdjusted: coveredAbsences.has(date),
       });
       continue;
     }
