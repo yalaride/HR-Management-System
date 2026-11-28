@@ -25,7 +25,7 @@ interface RecentDay {
   checkIn: string;
   checkOut: string;
   worked: string;
-  status: "On Time" | "Late" | "Absent" | "Holiday" | "Leave";
+  status: "On Time" | "Late" | "Absent" | "Holiday" | "Leave" | "Work from home";
 }
 
 function formatElapsed(ms: number): string {
@@ -100,6 +100,8 @@ export default function EmployeeAttendancePage() {
         return "bg-violet-50 text-violet-700 border-violet-200";
       case "Holiday":
         return "bg-sky-50 text-sky-700 border-sky-200";
+      case "Work from home":
+        return "bg-emerald-50 text-emerald-700 border-emerald-200";
       default:
         return "bg-surface-main text-content-secondary border-line-subtle";
     }

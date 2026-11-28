@@ -7,6 +7,7 @@ import dbConnect from "@/lib/mongodb";
 import { Attendance } from "@/modals/Attendance";
 import { AttendanceOmission } from "@/modals/AttendanceOmission";
 import { AbsenceLeaveCover } from "@/modals/AbsenceLeaveCover";
+import { WorkFromHomeDay } from "@/modals/WorkFromHomeDay";
 import { Employee } from "@/modals/Employee";
 import { MonthlyAttendance } from "@/modals/MonthlyAttendance";
 import { ActivityLog } from "@/modals/ActivityLog";
@@ -200,7 +201,7 @@ export async function getDayAttendanceSheet(date: string, options: DaySheetOptio
 
   const dayStart = new Date(`${date}T00:00:00.000Z`);
   const dayEnd = new Date(`${date}T23:59:59.999Z`);
-  const [employees, allLogs, allMonthlyRecords, holiday, approvedLeaves] = await Promise.all([
+  const [employees, allLogs, allMonthlyRecords, holiday, approvedLeaves, workFromHomeDays] = await Promise.all([
     employeeFind.lean(),
     Attendance.find({ date }).lean(),
     MonthlyAttendance.find({ year, month }).lean(),
@@ -214,6 +215,7 @@ export async function getDayAttendanceSheet(date: string, options: DaySheetOptio
     })
       .select("userId type")
       .lean<{ userId?: string; type?: string }[]>(),
+    WorkFromHomeDay.find({ date }).select("userId").lean<{ userId?: string }[]>(),
   ]);
 
   type LeanEmployeeDoc = Record<string, unknown> & { userId?: unknown; shiftTime?: string };
@@ -222,12 +224,14 @@ export async function getDayAttendanceSheet(date: string, options: DaySheetOptio
   let logs = allLogs;
   let monthlyRecords = allMonthlyRecords;
   let visibleLeaves = approvedLeaves;
+  let visibleWorkFromHome = workFromHomeDays;
 
   if (options.department) {
     const memberIds = new Set(employeeDocs.map((e) => String(e.userId ?? "")));
     logs = allLogs.filter((l) => memberIds.has(String(l.userId)));
     monthlyRecords = allMonthlyRecords.filter((r) => memberIds.has(String(r.userId)));
     visibleLeaves = approvedLeaves.filter((leave) => memberIds.has(String(leave.userId || "")));
+    visibleWorkFromHome = workFromHomeDays.filter((day) => memberIds.has(String(day.userId || "")));
   }
 
   const shiftStart = settings?.shiftStart || "09:00";
@@ -252,6 +256,7 @@ export async function getDayAttendanceSheet(date: string, options: DaySheetOptio
       userId: String(leave.userId || ""),
       type: String(leave.type || ""),
     })),
+    workFromHome: visibleWorkFromHome.map((day) => String(day.userId || "")),
   };
 }
 
@@ -327,7 +332,7 @@ export async function getUserAttendanceHistory(userId: string, period: string | 
   if (joinDate && joinDate > rangeFrom) rangeFrom = joinDate;
   if (rangeFrom > rangeTo) rangeFrom = rangeTo;
 
-  const [holidays, leaves, omissions, absenceCovers] = await Promise.all([
+  const [holidays, leaves, omissions, absenceCovers, workFromHomeDays] = await Promise.all([
     Holiday.find({ startDate: { $lte: rangeTo }, endDate: { $gte: rangeFrom } })
       .select("title startDate endDate")
       .lean<{ title: string; startDate: string; endDate: string }[]>(),
@@ -343,6 +348,9 @@ export async function getUserAttendanceHistory(userId: string, period: string | 
       .select("date")
       .lean<{ date: string }[]>(),
     AbsenceLeaveCover.find({ userId, date: { $gte: rangeFrom, $lte: quotaTo } })
+      .select("date")
+      .lean<{ date: string }[]>(),
+    WorkFromHomeDay.find({ userId, date: { $gte: rangeFrom, $lte: rangeTo } })
       .select("date")
       .lean<{ date: string }[]>(),
   ]);
@@ -371,6 +379,7 @@ export async function getUserAttendanceHistory(userId: string, period: string | 
     holidays,
     omittedDates: omissions.map((item) => item.date),
     coveredAbsentDates: absenceCovers.map((item) => item.date),
+    workFromHomeDates: workFromHomeDays.map((item) => item.date),
   });
 
   const lastMonthNumber = currentMonth === 1 ? 12 : currentMonth - 1;
@@ -510,7 +519,7 @@ export async function getPayableHoursForMonth(userId: string, year: number, mont
   if (joinDate && joinDate > from) from = joinDate;
   if (from > to) return 0;
 
-  const [logs, holidays, leaves, omissions, absenceCovers, settings] = await Promise.all([
+  const [logs, holidays, leaves, omissions, absenceCovers, workFromHomeDays, settings] = await Promise.all([
     Attendance.find({ userId, date: { $gte: from, $lte: to } }).lean(),
     Holiday.find({ startDate: { $lte: to }, endDate: { $gte: from } })
       .select("title startDate endDate")
@@ -525,6 +534,7 @@ export async function getPayableHoursForMonth(userId: string, year: number, mont
       .lean<{ type: string; status: string; startDate: Date; endDate: Date }[]>(),
     AttendanceOmission.find({ userId, date: { $gte: from, $lte: to } }).select("date").lean<{ date: string }[]>(),
     AbsenceLeaveCover.find({ userId, date: { $gte: from, $lte: to } }).select("date").lean<{ date: string }[]>(),
+    WorkFromHomeDay.find({ userId, date: { $gte: from, $lte: to } }).select("date").lean<{ date: string }[]>(),
     getActiveSettings(),
   ]);
 
@@ -551,6 +561,7 @@ export async function getPayableHoursForMonth(userId: string, year: number, mont
     holidays,
     omittedDates: omissions.map((item) => item.date),
     coveredAbsentDates: absenceCovers.map((item) => item.date),
+    workFromHomeDates: workFromHomeDays.map((item) => item.date),
   });
 
   return report.summary.totalHours;
@@ -655,6 +666,52 @@ export async function setAbsenceLeaveCover(input: {
     date,
     timestamp: new Date(),
     description: `The absent day ${date} was adjusted with unused monthly leave by Admin.`,
+  });
+  return { ok: true };
+}
+
+export async function setWorkFromHome(input: {
+  userId: string;
+  date: string;
+  enabled: boolean;
+}): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
+  await dbConnect();
+  const { userId, date, enabled } = input;
+  if (!userId || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return { ok: false, status: 400, error: "Choose a day for work from home." };
+  }
+  const today = getKarachiDateString();
+  if (date > today) {
+    return { ok: false, status: 400, error: "A future day cannot be set as work from home." };
+  }
+  const [year, month, day] = date.split("-").map((part) => Number(part));
+  if (new Date(Date.UTC(year, month - 1, day)).getUTCDay() === 0) {
+    return { ok: false, status: 400, error: "Sunday is not a working day." };
+  }
+  const lock = await MonthlyAttendance.findOne({ userId, year, month }).select("isLocked").lean<{ isLocked?: boolean } | null>();
+  if (lock?.isLocked) {
+    return { ok: false, status: 400, error: "This month is locked." };
+  }
+
+  if (!enabled) {
+    await WorkFromHomeDay.deleteOne({ userId, date });
+    await ActivityLog.create({
+      userId,
+      activityType: "CHECK_IN",
+      date,
+      timestamp: new Date(),
+      description: `Work from home for ${date} was removed by Admin.`,
+    });
+    return { ok: true };
+  }
+
+  await WorkFromHomeDay.updateOne({ userId, date }, { $setOnInsert: { userId, date } }, { upsert: true });
+  await ActivityLog.create({
+    userId,
+    activityType: "CHECK_IN",
+    date,
+    timestamp: new Date(),
+    description: `Work from home for ${date} was set by Admin. The day counts as 8 hours.`,
   });
   return { ok: true };
 }

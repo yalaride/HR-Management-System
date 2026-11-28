@@ -135,9 +135,11 @@ export async function GET() {
           ? "Leave"
           : day.arrival === "Holiday"
             ? "Holiday"
-            : day.arrival === "Unpaid leave"
-              ? "Absent"
-              : day.arrival,
+            : day.arrival === "Work from home"
+              ? "Work from home"
+              : day.arrival === "Unpaid leave"
+                ? "Absent"
+                : day.arrival,
     }));
 
     const monthlyRecord = (await MonthlyAttendance.findOne({

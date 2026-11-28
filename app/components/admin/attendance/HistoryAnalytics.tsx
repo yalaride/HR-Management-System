@@ -268,6 +268,47 @@ export default function HistoryAnalytics({
     setRefreshCounter((prev) => prev + 1);
   };
 
+  const setHomeDay = async (date: string, enabled: boolean) => {
+    const result = await Swal.fire({
+      title: enabled ? "Set work from home?" : "Remove work from home?",
+      html: enabled
+        ? `<b>${date}</b> will count as a full 8 hours.`
+        : `<b>${date}</b> will use the normal attendance again.`,
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: enabled ? "Set WFH" : "Remove",
+      cancelButtonText: "Cancel",
+      reverseButtons: true,
+      buttonsStyling: false,
+      customClass: {
+        popup: "bg-white border border-line-subtle rounded-2xl shadow-xl p-6 font-sans text-center",
+        title: "text-base font-bold text-content-main",
+        htmlContainer: "text-xs text-content-secondary mt-2 leading-relaxed",
+        actions: "flex gap-2 justify-center mt-5 w-full",
+        confirmButton:
+          "px-4 py-2.5 bg-brand-accent hover:bg-brand-hover text-white text-xs font-bold rounded-xl transition shadow-sm cursor-pointer",
+        cancelButton:
+          "px-4 py-2.5 bg-surface-main hover:bg-line-subtle text-content-secondary text-xs font-semibold rounded-xl transition cursor-pointer",
+      },
+    });
+    if (!result.isConfirmed) return;
+    const res = await fetch("/api/admin/employee-attendance", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: selectedEmployeeId, date, workFromHome: enabled }),
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      await Swal.fire({
+        icon: "error",
+        title: "Could not update work from home",
+        text: payload?.error || "This day could not be updated.",
+      });
+      return;
+    }
+    setRefreshCounter((prev) => prev + 1);
+  };
+
   const deleteAttendance = async (
     body: { userId: string; date: string },
     confirm: { title: string; html: string },
@@ -576,6 +617,7 @@ export default function HistoryAnalytics({
                     if (row.arrival === "Late") badgeStyle = "bg-amber-50 text-amber-700 border-amber-100";
                     if (row.arrival === "Absent" || row.arrival === "Unpaid leave") badgeStyle = "bg-rose-50 text-rose-700 border-rose-100";
                     if (row.arrival === "Holiday" || row.arrival === "Paid leave") badgeStyle = "bg-sky-50 text-sky-700 border-sky-100";
+                    if (row.arrival === "Work from home") badgeStyle = "bg-emerald-50 text-emerald-700 border-emerald-100";
 
                     const adjusted =
                       row.leaveAdjusted || row.detail.startsWith("Adjusted with monthly leave");
@@ -617,6 +659,19 @@ export default function HistoryAnalytics({
                               </button>
                             ) : null}
                             {!isLocked && row.arrival !== "Holiday" && row.arrival !== "Paid leave" ? (
+                              <button
+                                type="button"
+                                onClick={() => void setHomeDay(row.date, !row.workFromHome)}
+                                className={`px-2 py-1 text-[10px] font-bold rounded-lg border cursor-pointer ${
+                                  row.workFromHome
+                                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                    : "border-line-subtle bg-white text-content-main"
+                                }`}
+                              >
+                                {row.workFromHome ? "Undo WFH" : "WFH"}
+                              </button>
+                            ) : null}
+                            {!isLocked && row.arrival !== "Holiday" && row.arrival !== "Paid leave" && row.arrival !== "Work from home" ? (
                               <button
                                 type="button"
                                 onClick={() => handleOpenEditModal(row.date, log)}

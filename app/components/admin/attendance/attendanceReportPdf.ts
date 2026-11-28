@@ -110,6 +110,7 @@ export async function downloadAttendanceReport(input: AttendancePdfInput) {
     }
     if (row.arrival === "Holiday") doc.setFillColor(224, 242, 254);
     else if (row.arrival === "Paid leave") doc.setFillColor(237, 233, 254);
+    else if (row.arrival === "Work from home") doc.setFillColor(220, 252, 231);
     else if (row.arrival === "Absent" || row.arrival === "Unpaid leave") doc.setFillColor(255, 228, 230);
     else doc.setFillColor(255, 255, 255);
     doc.rect(12, y, tableWidth, rowHeight, "F");

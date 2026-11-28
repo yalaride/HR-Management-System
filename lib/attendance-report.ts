@@ -14,6 +14,7 @@ export interface AttendanceReportRow {
   paid: string;
   detail: string;
   leaveAdjusted?: boolean;
+  workFromHome?: boolean;
   fullDaysRemaining?: number;
   rawExtraMinutes: number;
   rawShortMinutes: number;
@@ -211,9 +212,11 @@ export function buildAttendanceReport(input: {
   holidays: ReportHoliday[];
   omittedDates?: string[];
   coveredAbsentDates?: string[];
+  workFromHomeDates?: string[];
 }): AttendanceReport {
   const omitted = new Set(input.omittedDates || []);
   const coveredAbsences = new Set(input.coveredAbsentDates || []);
+  const workFromHome = new Set(input.workFromHomeDates || []);
   const punchByDate = new Map(input.punches.map((punch) => [punch.date, punch]));
   const [startHour, startMinute] = input.shiftStart.split(":").map((part) => Number(part) || 0);
   const graceLimit = startHour * 60 + startMinute + input.gracePeriod;
@@ -237,7 +240,7 @@ export function buildAttendanceReport(input: {
     const punch = punchByDate.get(date);
     const now = input.now ?? new Date();
     const completed = completedShift(punch, now);
-    if (date.startsWith("2026-10") && !punch?.checkIn && !punch?.checkOut && !holiday && !leave) continue;
+    if (date.startsWith("2026-10") && !punch?.checkIn && !punch?.checkOut && !holiday && !leave && !workFromHome.has(date)) continue;
 
     if (holiday) {
       const extra = completed ? Math.max(0, completed.worked - REQUIRED_DAY_MINUTES) : 0;
@@ -259,6 +262,27 @@ export function buildAttendanceReport(input: {
         extra: extra ? formatMinutes(extra) : "—",
         rawExtraMinutes: extra,
         rawShortMinutes: 0,
+      });
+      continue;
+    }
+
+    if (workFromHome.has(date) && !(leave && isPaidLeave(leave.type))) {
+      const extra = completed ? Math.max(0, completed.worked - REQUIRED_DAY_MINUTES) : 0;
+      attendedMinutes += REQUIRED_DAY_MINUTES;
+      days.push({
+        date,
+        weekday,
+        checkIn: completed ? clock(completed.checkIn) : "—",
+        checkOut: completed ? clock(completed.checkOut) : "—",
+        arrival: "Work from home",
+        worked: "8 hrs 0 mins",
+        short: "—",
+        paid: "—",
+        detail: "Work from home · 8 hours",
+        extra: extra ? formatMinutes(extra) : "—",
+        rawExtraMinutes: extra,
+        rawShortMinutes: 0,
+        workFromHome: true,
       });
       continue;
     }
@@ -426,6 +450,7 @@ export function buildAttendanceReport(input: {
   let finalShort = 0;
 
   for (const day of days) {
+    if (day.arrival === "Work from home") continue;
     if (day.rawShortMinutes < 0) continue;
     let gap = day.rawShortMinutes;
     const absentDay = day.arrival === "Absent";

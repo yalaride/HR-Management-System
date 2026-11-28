@@ -45,6 +45,7 @@ interface DaySheet {
   department: string;
   leaves?: DayLeave[];
   holiday?: { title: string } | null;
+  workFromHome?: string[];
 }
 
 const TIMEZONE = "Asia/Karachi";
@@ -70,6 +71,7 @@ const statusBadge: Record<string, string> = {
   Absent: "bg-rose-50 text-rose-600 border-rose-200",
   Leave: "bg-violet-50 text-violet-700 border-violet-200",
   Holiday: "bg-sky-50 text-sky-700 border-sky-200",
+  "Work from home": "bg-emerald-50 text-emerald-700 border-emerald-200",
 };
 
 export default function TeamAttendancePage() {
@@ -109,7 +111,11 @@ export default function TeamAttendancePage() {
   const employees = sheet?.employees ?? [];
   const logs = sheet?.logs ?? [];
   const leaves = sheet?.leaves ?? [];
-  const presentCount = logs.filter((l) => l.checkIn && (l.status === "On Time" || l.status === "Late")).length;
+  const presentCount = employees.filter((emp) => {
+    const log = logs.find((item) => String(item.userId) === emp.userId);
+    if ((sheet?.workFromHome || []).includes(emp.userId)) return true;
+    return Boolean(log?.checkIn && (log.status === "On Time" || log.status === "Late"));
+  }).length;
 
   return (
     <div className="min-h-screen bg-surface-main text-content-main antialiased">
@@ -162,8 +168,11 @@ export default function TeamAttendancePage() {
                   {employees.map((emp) => {
                     const log = logs.find((l) => String(l.userId) === emp.userId);
                     const onLeave = leaves.some((leave) => leave.userId === emp.userId);
+                    const onHome = (sheet?.workFromHome || []).includes(emp.userId);
                     const hasCheckIn = Boolean(log?.checkIn);
-                    const statusLabel = hasCheckIn
+                    const statusLabel = onHome && !onLeave && !sheet?.holiday
+                      ? "Work from home"
+                      : hasCheckIn
                       ? log?.status
                       : onLeave
                         ? "Leave"
@@ -186,7 +195,7 @@ export default function TeamAttendancePage() {
                           {formatTime(log?.checkOut)}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
-                          {log?.formattedDuration || "—"}
+                          {statusLabel === "Work from home" ? "8 hrs 0 mins" : log?.formattedDuration || "—"}
                         </td>
                         <td className="px-4 py-3">
                           {statusLabel ? (

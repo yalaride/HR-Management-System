@@ -5,6 +5,7 @@ import useSWR from "swr";
 import { useSession } from "next-auth/react";
 import { usePathname, useRouter } from "next/navigation";
 import { Plus, RefreshCw, AlertCircle } from "lucide-react";
+import Swal from "sweetalert2";
 
 import AttendanceSummaryCards from "@/app/components/admin/attendance/AttendanceSummaryCards";
 import AttendanceFilters from "@/app/components/admin/attendance/AttendanceFilters";
@@ -68,7 +69,7 @@ function formatShiftTime(shift: string): string {
   return formatTo12Hour(shift.trim());
 }
 
-type AttendanceStatus = "On Time" | "Late" | "Absent" | "Holiday" | "Leave";
+type AttendanceStatus = "On Time" | "Late" | "Absent" | "Holiday" | "Leave" | "Work from home";
 
 interface EmployeeRecord {
   id: string;
@@ -122,6 +123,7 @@ interface DaySheetResponse {
   companySettings?: CompanySettings;
   holiday?: { title: string; startDate: string; endDate: string } | null;
   leaves?: { userId: string; type: string }[];
+  workFromHome?: string[];
 }
 
 export default function AdminAttendancePage() {
@@ -213,7 +215,10 @@ export default function AdminAttendancePage() {
       );
 
       const onLeave = (daySheet?.leaves || []).some((leave) => leave.userId === String(emp.userId));
-      const status: AttendanceStatus = log?.checkIn && log.status && log.status !== "Absent"
+      const onHome = (daySheet?.workFromHome || []).includes(String(emp.userId));
+      const status: AttendanceStatus = onHome && !onLeave && !daySheet?.holiday
+        ? "Work from home"
+        : log?.checkIn && log.status && log.status !== "Absent"
         ? log.status
         : onLeave
           ? "Leave"
@@ -237,16 +242,16 @@ export default function AdminAttendancePage() {
           : "",
         rawCheckIn: log?.checkIn || null,
         rawCheckOut: checkOutValid ? log?.checkOut || null : null,
-        workingHours: checkOutValid ? log?.workingHours || 0 : 0,
-        formattedDuration: checkOutValid ? log?.formattedDuration || "" : "",
+        workingHours: status === "Work from home" ? 8 : checkOutValid ? log?.workingHours || 0 : 0,
+        formattedDuration: status === "Work from home" ? "8 hrs 0 mins" : checkOutValid ? log?.formattedDuration || "" : "",
         status,
         isLocked,
       };
     });
-  }, [employees, attendanceLogs, monthlyRecords, shiftTimeLabel, daySheet?.holiday, daySheet?.leaves]);
+  }, [employees, attendanceLogs, monthlyRecords, shiftTimeLabel, daySheet?.holiday, daySheet?.leaves, daySheet?.workFromHome]);
 
   const metrics = useMemo(() => {
-    const presentCount = mergedRecords.filter((r) => r.status === "On Time" || r.status === "Late").length;
+    const presentCount = mergedRecords.filter((r) => r.status === "On Time" || r.status === "Late" || r.status === "Work from home").length;
     const absentCount = mergedRecords.filter((r) => r.status === "Absent").length;
     const onTimeCount = mergedRecords.filter((r) => r.status === "On Time").length;
     const lateCount = mergedRecords.filter((r) => r.status === "Late").length;
@@ -269,6 +274,28 @@ export default function AdminAttendancePage() {
       return matchSearch && matchDept && matchStatus;
     });
   }, [mergedRecords, searchQuery, filterDept, filterStatus]);
+
+  const toggleWorkFromHome = async (userId: string, enabled: boolean) => {
+    const result = await Swal.fire({
+      title: enabled ? "Set work from home?" : "Remove work from home?",
+      text: enabled ? "Today will count as a full 8 hours." : "This day will use the normal attendance again.",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: enabled ? "Set WFH" : "Remove",
+    });
+    if (!result.isConfirmed) return;
+    const res = await fetch("/api/admin/employee-attendance", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, date: filterDate, workFromHome: enabled }),
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      await Swal.fire({ icon: "error", title: "Could not update work from home", text: payload?.error || "This day could not be updated." });
+      return;
+    }
+    await refreshDaySheet();
+  };
 
   const handleOpenEdit = (userId: string) => {
     const record = attendanceLogs.find((l) => l.userId === userId);
@@ -460,7 +487,7 @@ export default function AdminAttendancePage() {
                 )
               ),
             ]}
-            statuses={["All", "On Time", "Late", "Absent", "Leave", "Holiday"]}
+            statuses={["All", "On Time", "Late", "Absent", "Leave", "Holiday", "Work from home"]}
             onClear={() => {
               setSearchQuery("");
               setFilterDept("All");
@@ -478,6 +505,7 @@ export default function AdminAttendancePage() {
                 setDrillEmployeeId(id);
                 setActiveTab("history-drill");
               }}
+              onToggleWorkFromHome={(userId, enabled) => void toggleWorkFromHome(userId, enabled)}
             />
           )}
         </div>

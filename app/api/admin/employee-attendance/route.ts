@@ -7,6 +7,7 @@ import {
   getDayAttendanceSheet,
   getUserAttendanceHistory,
   setAbsenceLeaveCover,
+  setWorkFromHome,
   upsertAttendanceRecord,
 } from "@/lib/attendance-service";
 
@@ -54,6 +55,17 @@ export async function POST(request: Request) {
         userId: body.userId,
         date: body.date,
         cover: body.coverAbsence,
+      });
+      if (!result.ok) {
+        return NextResponse.json({ error: result.error }, { status: result.status });
+      }
+      return NextResponse.json({ success: true }, { status: 200 });
+    }
+    if (typeof body.workFromHome === "boolean") {
+      const result = await setWorkFromHome({
+        userId: body.userId,
+        date: body.date,
+        enabled: body.workFromHome,
       });
       if (!result.ok) {
         return NextResponse.json({ error: result.error }, { status: result.status });
