@@ -13,9 +13,17 @@ interface RetroLogModalProps {
     date: string;
     checkIn: string;
     checkOut: string;
-    status: "On Time" | "Late" | "Absent";
+    status: "On Time" | "Late" | "Absent" | "Work from home";
+    allowWorkFromHome: boolean;
   };
-  onSave: (payload: { userId: string; date: string; checkIn: string | null; checkOut: string | null; status: "On Time" | "Late" | "Absent" }) => Promise<void>;
+  onSave: (payload: {
+    userId: string;
+    date: string;
+    checkIn: string | null;
+    checkOut: string | null;
+    status: "On Time" | "Late" | "Absent" | "Work from home";
+    clearWorkFromHome?: boolean;
+  }) => Promise<void>;
 }
 
 export default function RetroLogModal({
@@ -35,6 +43,7 @@ export default function RetroLogModal({
     checkIn: initialData.checkIn,
     checkOut: initialData.checkOut,
     status: initialData.status,
+    allowWorkFromHome: initialData.allowWorkFromHome,
   });
 
   useEffect(() => {
@@ -44,6 +53,7 @@ export default function RetroLogModal({
       checkIn: initialData.checkIn,
       checkOut: initialData.checkOut,
       status: initialData.status,
+      allowWorkFromHome: initialData.allowWorkFromHome,
     });
     setFormError(null);
   }, [isOpen, initialData]);
@@ -72,14 +82,15 @@ export default function RetroLogModal({
     try {
       setSubmitting(true);
       setFormError(null);
-      const isAbsent = form.status === "Absent";
+      const skipsTimes = form.status === "Absent" || form.status === "Work from home";
 
       await onSave({
         userId,
         date: form.date,
-        checkIn: isAbsent ? null : `${form.date}T${form.checkIn}:00+05:00`,
-        checkOut: isAbsent ? null : `${form.date}T${form.checkOut}:00+05:00`,
+        checkIn: skipsTimes ? null : `${form.date}T${form.checkIn}:00+05:00`,
+        checkOut: skipsTimes ? null : `${form.date}T${form.checkOut}:00+05:00`,
         status: form.status,
+        clearWorkFromHome: initialData.status === "Work from home" && form.status !== "Work from home",
       });
       onClose();
     } catch (err) {
@@ -129,16 +140,23 @@ export default function RetroLogModal({
             <label className="block text-[10px] font-bold uppercase mb-1.5 text-content-muted">Arrival Status</label>
             <select
               value={form.status}
-              onChange={(e) => setForm({ ...form, status: e.target.value as "On Time" | "Late" | "Absent" })}
+              onChange={(e) => setForm({ ...form, status: e.target.value as "On Time" | "Late" | "Absent" | "Work from home" })}
               className={inputClass}
             >
               <option value="On Time">On Time</option>
               <option value="Late">Late</option>
               <option value="Absent">Absent</option>
+              {form.allowWorkFromHome ? <option value="Work from home">Work from home</option> : null}
             </select>
           </div>
 
-          {form.status !== "Absent" && (
+          {form.status === "Work from home" ? (
+            <div className="p-2.5 bg-emerald-50 border border-emerald-100 rounded-xl text-[10px] text-emerald-800 leading-normal">
+              This day counts as a full <strong>8 hours</strong>. No fingerprint check-in is required.
+            </div>
+          ) : null}
+
+          {form.status !== "Absent" && form.status !== "Work from home" && (
             <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-100">
               <div>
                 <label className="block text-[10px] font-bold uppercase mb-1.5 text-content-muted">Check-In</label>

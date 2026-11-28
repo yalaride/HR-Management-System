@@ -28,14 +28,12 @@ interface TableProps {
   records: RecordRow[];
   onEditTimesheet: (userId: string) => void;
   onDrillHistory: (userId: string) => void;
-  onToggleWorkFromHome?: (userId: string, enabled: boolean) => void;
 }
 
 export default function AttendanceTable({
   records,
   onEditTimesheet,
   onDrillHistory,
-  onToggleWorkFromHome,
 }: TableProps) {
   return (
     <div className="bg-white border border-line-subtle rounded-2xl shadow-xs overflow-hidden">
@@ -159,19 +157,6 @@ export default function AttendanceTable({
                         >
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
-                        {onToggleWorkFromHome && !rec.isLocked && rec.status !== "Holiday" && rec.status !== "Leave" ? (
-                          <button
-                            type="button"
-                            onClick={() => onToggleWorkFromHome(rec.userId, rec.status !== "Work from home")}
-                            className={`px-2 py-1 text-[10px] font-bold rounded-lg border cursor-pointer ${
-                              rec.status === "Work from home"
-                                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                                : "border-line-subtle bg-white text-content-main"
-                            }`}
-                          >
-                            {rec.status === "Work from home" ? "Undo WFH" : "WFH"}
-                          </button>
-                        ) : null}
 
                         <button
                           onClick={() => onDrillHistory(rec.userId)}

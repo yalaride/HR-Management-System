@@ -5,7 +5,6 @@ import useSWR from "swr";
 import { useSession } from "next-auth/react";
 import { usePathname, useRouter } from "next/navigation";
 import { Plus, RefreshCw, AlertCircle } from "lucide-react";
-import Swal from "sweetalert2";
 
 import AttendanceSummaryCards from "@/app/components/admin/attendance/AttendanceSummaryCards";
 import AttendanceFilters from "@/app/components/admin/attendance/AttendanceFilters";
@@ -113,7 +112,8 @@ interface SaveAttendancePayload {
   date: string;
   checkIn: string | null;
   checkOut: string | null;
-  status: AttendanceStatus;
+  status: "On Time" | "Late" | "Absent" | "Work from home";
+  clearWorkFromHome?: boolean;
 }
 
 interface DaySheetResponse {
@@ -168,8 +168,9 @@ export default function AdminAttendancePage() {
     checkOut: "17:00",
     hasCheckOut: false,
     enableCheckOut: false,
-    status: "On Time" as "On Time" | "Late" | "Absent",
+    status: "On Time" as "On Time" | "Late" | "Absent" | "Work from home",
     isLocked: false,
+    allowWorkFromHome: false,
   });
 
   const triggerToast = (msg: string) => {
@@ -275,34 +276,14 @@ export default function AdminAttendancePage() {
     });
   }, [mergedRecords, searchQuery, filterDept, filterStatus]);
 
-  const toggleWorkFromHome = async (userId: string, enabled: boolean) => {
-    const result = await Swal.fire({
-      title: enabled ? "Set work from home?" : "Remove work from home?",
-      text: enabled ? "Today will count as a full 8 hours." : "This day will use the normal attendance again.",
-      icon: "question",
-      showCancelButton: true,
-      confirmButtonText: enabled ? "Set WFH" : "Remove",
-    });
-    if (!result.isConfirmed) return;
-    const res = await fetch("/api/admin/employee-attendance", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId, date: filterDate, workFromHome: enabled }),
-    });
-    const payload = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      await Swal.fire({ icon: "error", title: "Could not update work from home", text: payload?.error || "This day could not be updated." });
-      return;
-    }
-    await refreshDaySheet();
-  };
-
   const handleOpenEdit = (userId: string) => {
     const record = attendanceLogs.find((l) => l.userId === userId);
     const targetRecord = mergedRecords.find((r) => r.userId === userId);
     setSelectedUserId(userId);
 
     const hasCheckOut = !!record?.checkOut;
+    const hasCheckIn = Boolean(record?.checkIn);
+    const isHome = targetRecord?.status === "Work from home";
     const defaultCheckIn = companySettings?.shiftStart || "09:00";
     const defaultCheckOut = companySettings?.shiftEnd || "17:00";
 
@@ -310,17 +291,45 @@ export default function AdminAttendancePage() {
       checkIn: formatToLocalTimeInput(record?.checkIn, defaultCheckIn),
       checkOut: formatToLocalTimeInput(record?.checkOut, defaultCheckOut),
       hasCheckOut: hasCheckOut,
-      enableCheckOut: hasCheckOut, 
-      status:
-        record?.status === "Late" || record?.status === "Absent" || record?.status === "On Time"
+      enableCheckOut: hasCheckOut,
+      status: isHome && !hasCheckIn
+        ? "Work from home"
+        : record?.status === "Late" || record?.status === "Absent" || record?.status === "On Time"
           ? record.status
           : "On Time",
       isLocked: !!targetRecord?.isLocked,
+      allowWorkFromHome:
+        !hasCheckIn &&
+        targetRecord?.status !== "Leave" &&
+        targetRecord?.status !== "Holiday",
     });
     setIsEditModalOpen(true);
   };
 
   const handleSaveAttendance = async (payload: SaveAttendancePayload) => {
+    if (payload.status === "Work from home" || payload.clearWorkFromHome) {
+      const homeRes = await fetch("/api/admin/employee-attendance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: payload.userId,
+          date: payload.date,
+          workFromHome: payload.status === "Work from home",
+        }),
+      });
+      if (!homeRes.ok) {
+        const errData = await homeRes.json().catch(() => ({}));
+        throw new Error(errData?.error || "Work from home could not be saved.");
+      }
+      if (payload.status === "Work from home") {
+        setIsAddModalOpen(false);
+        setIsEditModalOpen(false);
+        triggerToast("Work from home saved. This day counts as 8 hours.");
+        await refreshDaySheet();
+        return;
+      }
+    }
+
     const res = await fetch("/api/admin/employee-attendance", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -505,7 +514,6 @@ export default function AdminAttendancePage() {
                 setDrillEmployeeId(id);
                 setActiveTab("history-drill");
               }}
-              onToggleWorkFromHome={(userId, enabled) => void toggleWorkFromHome(userId, enabled)}
             />
           )}
         </div>

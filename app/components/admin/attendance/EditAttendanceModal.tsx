@@ -13,10 +13,18 @@ interface EditAttendanceModalProps {
     checkOut: string;
     hasCheckOut: boolean;
     enableCheckOut: boolean;
-    status: "On Time" | "Late" | "Absent";
+    status: "On Time" | "Late" | "Absent" | "Work from home";
     isLocked: boolean;
+    allowWorkFromHome: boolean;
   };
-  onSave: (payload: { userId: string; date: string; checkIn: string | null; checkOut: string | null; status: "On Time" | "Late" | "Absent" }) => Promise<void>;
+  onSave: (payload: {
+    userId: string;
+    date: string;
+    checkIn: string | null;
+    checkOut: string | null;
+    status: "On Time" | "Late" | "Absent" | "Work from home";
+    clearWorkFromHome?: boolean;
+  }) => Promise<void>;
   shiftStart?: string;
   gracePeriod?: number;
 }
@@ -38,7 +46,7 @@ export default function EditAttendanceModal({
   const [checkInTime, setCheckInTime] = useState(initialData.checkIn);
   const [checkOutTime, setCheckOutTime] = useState(initialData.checkOut);
   const [enableCheckOut, setEnableCheckOut] = useState(initialData.enableCheckOut);
-  const [status, setStatus] = useState<"On Time" | "Late" | "Absent">(initialData.status);
+  const [status, setStatus] = useState<"On Time" | "Late" | "Absent" | "Work from home">(initialData.status);
 
   const minutesOf = (value: string) => {
     const [hours, minutes] = value.split(":").map((part) => Number(part) || 0);
@@ -82,7 +90,7 @@ export default function EditAttendanceModal({
     try {
       setSubmitting(true);
       setFormError(null);
-      const isAbsent = status === "Absent";
+      const isAbsent = status === "Absent" || status === "Work from home";
 
       await onSave({
         userId,
@@ -90,6 +98,7 @@ export default function EditAttendanceModal({
         checkIn: isAbsent ? null : `${date}T${checkInTime}:00+05:00`,
         checkOut: (isAbsent || !enableCheckOut) ? null : `${date}T${checkOutTime}:00+05:00`,
         status,
+        clearWorkFromHome: initialData.status === "Work from home" && status !== "Work from home",
       });
     } catch (err) {
       setFormError((err as Error | undefined)?.message || "Failed updating timesheet record.");
@@ -142,7 +151,9 @@ export default function EditAttendanceModal({
 
                 {isStatusOpen && (
                   <div className="dropdown-panel absolute left-0 right-0 mt-1.5 animate-in fade-in slide-in-from-top-1 duration-150 z-50 bg-white border rounded-xl shadow-lg">
-                    {(["On Time", "Late", "Absent"] as const).map((opt) => (
+                    {(["On Time", "Late", "Absent", "Work from home"] as const)
+                      .filter((opt) => opt !== "Work from home" || initialData.allowWorkFromHome)
+                      .map((opt) => (
                       <button
                         key={opt}
                         type="button"
@@ -161,7 +172,16 @@ export default function EditAttendanceModal({
                 )}
               </div>
 
-              {status !== "Absent" && (
+              {status === "Work from home" ? (
+                <div className="flex items-start gap-2 p-2.5 bg-emerald-50 border border-emerald-100 rounded-xl">
+                  <Info className="w-3.5 h-3.5 text-emerald-600 mt-0.5 shrink-0" />
+                  <span className="text-[10px] text-emerald-800 leading-normal">
+                    This day counts as a full <strong>8 hours</strong>. No fingerprint check-in is required.
+                  </span>
+                </div>
+              ) : null}
+
+              {status !== "Absent" && status !== "Work from home" && (
                 <div className="space-y-4">
                   {/* 2. Styled Check-In Time Input */}
                   <div>

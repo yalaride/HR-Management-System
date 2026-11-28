@@ -132,7 +132,8 @@ export default function HistoryAnalytics({
     date: "",
     checkIn: "09:00",
     checkOut: "17:00",
-    status: "On Time" as "On Time" | "Late" | "Absent",
+    status: "On Time" as "On Time" | "Late" | "Absent" | "Work from home",
+    allowWorkFromHome: false,
   });
 
   const [isEmpOpen, setIsEmpOpen] = useState(false);
@@ -197,13 +198,15 @@ export default function HistoryAnalytics({
     if (!hasLastMonth && period === "last-month") onPeriodChange("this-month");
   }, [hasLastMonth, period, onPeriodChange]);
 
-  const handleOpenEditModal = (date: string, log?: AttendanceLog) => {
+  const handleOpenEditModal = (date: string, log?: AttendanceLog, workFromHome = false) => {
+    const hasCheckIn = Boolean(log?.checkIn);
     setEditingLogId(log?._id || date);
     setDialogForm({
       date,
       checkIn: formatToLocalTimeInput(log?.checkIn, shiftStart),
       checkOut: formatToLocalTimeInput(log?.checkOut, shiftEnd),
-      status: log?.status === "Late" ? "Late" : "On Time",
+      status: workFromHome && !hasCheckIn ? "Work from home" : log?.status === "Late" ? "Late" : "On Time",
+      allowWorkFromHome: !hasCheckIn,
     });
     setIsModalOpen(true);
   };
@@ -213,8 +216,28 @@ export default function HistoryAnalytics({
     date: string;
     checkIn: string | null;
     checkOut: string | null;
-    status: "On Time" | "Late" | "Absent";
+    status: "On Time" | "Late" | "Absent" | "Work from home";
+    clearWorkFromHome?: boolean;
   }) => {
+    if (payload.status === "Work from home" || payload.clearWorkFromHome) {
+      const homeRes = await fetch("/api/admin/employee-attendance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: payload.userId,
+          date: payload.date,
+          workFromHome: payload.status === "Work from home",
+        }),
+      });
+      if (!homeRes.ok) {
+        const errorMsg = await homeRes.json().catch(() => ({}));
+        throw new Error(errorMsg?.error || "Work from home could not be saved.");
+      }
+      if (payload.status === "Work from home") {
+        setRefreshCounter((prev) => prev + 1);
+        return;
+      }
+    }
     const res = await fetch("/api/admin/employee-attendance", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -262,47 +285,6 @@ export default function HistoryAnalytics({
         icon: "error",
         title: "Could not adjust this day",
         text: payload?.error || "The monthly leave could not be applied.",
-      });
-      return;
-    }
-    setRefreshCounter((prev) => prev + 1);
-  };
-
-  const setHomeDay = async (date: string, enabled: boolean) => {
-    const result = await Swal.fire({
-      title: enabled ? "Set work from home?" : "Remove work from home?",
-      html: enabled
-        ? `<b>${date}</b> will count as a full 8 hours.`
-        : `<b>${date}</b> will use the normal attendance again.`,
-      icon: "question",
-      showCancelButton: true,
-      confirmButtonText: enabled ? "Set WFH" : "Remove",
-      cancelButtonText: "Cancel",
-      reverseButtons: true,
-      buttonsStyling: false,
-      customClass: {
-        popup: "bg-white border border-line-subtle rounded-2xl shadow-xl p-6 font-sans text-center",
-        title: "text-base font-bold text-content-main",
-        htmlContainer: "text-xs text-content-secondary mt-2 leading-relaxed",
-        actions: "flex gap-2 justify-center mt-5 w-full",
-        confirmButton:
-          "px-4 py-2.5 bg-brand-accent hover:bg-brand-hover text-white text-xs font-bold rounded-xl transition shadow-sm cursor-pointer",
-        cancelButton:
-          "px-4 py-2.5 bg-surface-main hover:bg-line-subtle text-content-secondary text-xs font-semibold rounded-xl transition cursor-pointer",
-      },
-    });
-    if (!result.isConfirmed) return;
-    const res = await fetch("/api/admin/employee-attendance", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: selectedEmployeeId, date, workFromHome: enabled }),
-    });
-    const payload = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      await Swal.fire({
-        icon: "error",
-        title: "Could not update work from home",
-        text: payload?.error || "This day could not be updated.",
       });
       return;
     }
@@ -661,20 +643,7 @@ export default function HistoryAnalytics({
                             {!isLocked && row.arrival !== "Holiday" && row.arrival !== "Paid leave" ? (
                               <button
                                 type="button"
-                                onClick={() => void setHomeDay(row.date, !row.workFromHome)}
-                                className={`px-2 py-1 text-[10px] font-bold rounded-lg border cursor-pointer ${
-                                  row.workFromHome
-                                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                                    : "border-line-subtle bg-white text-content-main"
-                                }`}
-                              >
-                                {row.workFromHome ? "Undo WFH" : "WFH"}
-                              </button>
-                            ) : null}
-                            {!isLocked && row.arrival !== "Holiday" && row.arrival !== "Paid leave" && row.arrival !== "Work from home" ? (
-                              <button
-                                type="button"
-                                onClick={() => handleOpenEditModal(row.date, log)}
+                                onClick={() => handleOpenEditModal(row.date, log, Boolean(row.workFromHome))}
                                 className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg cursor-pointer inline-flex items-center justify-center"
                               >
                                 <Edit2 className="w-3.5 h-3.5" />
